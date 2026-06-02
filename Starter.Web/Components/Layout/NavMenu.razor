@@ -1,0 +1,31 @@
+@inject NavRegistry Registry
+@inject ShellStateService Shell
+
+<div class="nav-shell">
+    @if (Registry.Modules.Count > 1)
+    {
+        @* Rail: one tab per module. Hidden automatically when there's only one. *@
+        <div class="nav-rail">
+            @for (var i = 0; i < Registry.Modules.Count; i++)
+            {
+                var index = i;
+                var module = Registry.Modules[index];
+                <MudTooltip Text="@module.Title" Placement="Placement.Right">
+                    <MudIconButton Icon="@module.Icon" Size="Size.Large"
+                                   Color="@(index == Shell.ActiveModuleIndex ? Color.Primary : Color.Default)"
+                                   OnClick="@(() => Shell.ActiveModuleIndex = index)" />
+                </MudTooltip>
+            }
+        </div>
+    }
+
+    @* Panel: the active module's own navigation markup. *@
+    <div class="nav-panel">
+        <MudText Typo="Typo.subtitle2" Class="px-4 py-3 mud-text-secondary">@ActiveModule.Title</MudText>
+        <DynamicComponent Type="ActiveModule.NavComponent" />
+    </div>
+</div>
+
+@code {
+    private NavModule ActiveModule => Registry.Modules[Shell.ActiveModuleIndex];
+}

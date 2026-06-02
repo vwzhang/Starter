@@ -1,0 +1,46 @@
+@inject ShellStateService Shell
+
+@* MudBlazor providers — rendered once for the whole app. *@
+<MudThemeProvider @bind-IsDarkMode="Shell.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        @if (Sidebar is not null)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit"
+                           Edge="Edge.Start" OnClick="ToggleDrawer" aria-label="Toggle navigation" />
+        }
+        <MudText Typo="Typo.h6" Class="ml-2">Starter</MudText>
+        <MudSpacer />
+        <MudIconButton Color="Color.Inherit" OnClick="ToggleDarkMode"
+                       Icon="@(Shell.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       aria-label="Toggle dark mode" />
+    </MudAppBar>
+
+    @if (Sidebar is not null)
+    {
+        <MudDrawer @bind-Open="Shell.DrawerOpen" Width="300px" Elevation="2"
+                   ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
+            @Sidebar
+        </MudDrawer>
+    }
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-6">
+            @ChildContent
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    /// <summary>Optional left navigation region. When null the shell has no drawer.</summary>
+    [Parameter] public RenderFragment? Sidebar { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private void ToggleDrawer() => Shell.DrawerOpen = !Shell.DrawerOpen;
+    private void ToggleDarkMode() => Shell.IsDarkMode = !Shell.IsDarkMode;
+}

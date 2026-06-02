@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Starter.ApiService/Starter.ApiService.csproj" />
+  <Project Path="Starter.AppHost/Starter.AppHost.csproj" />
+  <Project Path="Starter.ServiceDefaults/Starter.ServiceDefaults.csproj" />
+  <Project Path="Starter.Tests/Starter.Tests.csproj" />
+  <Project Path="Starter.Web/Starter.Web.csproj" />
+</Solution>
