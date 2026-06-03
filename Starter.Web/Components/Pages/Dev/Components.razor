@@ -1,10 +1,185 @@
 @page "/dev/components"
+@page "/dev/dashboard"
 
-<PageTitle>Components</PageTitle>
+<PageTitle>Dev Dashboard</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Components</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">Component gallery — skeleton.</MudText>
+<MudStack Spacing="3" Class="dev-dashboard">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="dev-dashboard-header">
+        <div>
+            <MudText Typo="Typo.h4" HtmlTag="h1">Dev Dashboard</MudText>
+            <MudText Typo="Typo.body2" Class="starter-muted">
+                A copyable dashboard composition for internal tools and operational starter screens.
+            </MudText>
+        </div>
+        <MudStack Row="true" Spacing="1" Class="dev-dashboard-actions">
+            <MudButton Href="/admin" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AdminPanelSettings">
+                Admin
+            </MudButton>
+            <MudButton Href="/dev/crud" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableRows">
+                CRUD
+            </MudButton>
+        </MudStack>
+    </MudStack>
 
-<MudPaper Class="pa-6" Outlined="true">
-    <MudText Typo="Typo.body2" Color="Color.Secondary">Placeholder. Add component samples here.</MudText>
-</MudPaper>
+    <MudGrid Spacing="3">
+        @foreach (var metric in Metrics)
+        {
+            <MudItem xs="12" sm="6" lg="3">
+                <MudPaper Class="pa-4 dev-dashboard-metric" Outlined="true">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <span class="dev-dashboard-metric-icon @metric.IconClass">
+                            <MudIcon Icon="@metric.Icon" />
+                        </span>
+                        <span class="dev-dashboard-trend @metric.TrendClass">@metric.Trend</span>
+                    </MudStack>
+                    <MudText Typo="Typo.h4" Class="mt-3">@metric.Value</MudText>
+                    <MudText Typo="Typo.subtitle2">@metric.Label</MudText>
+                    <MudText Typo="Typo.body2" Class="starter-muted">@metric.Caption</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="pa-4 dev-dashboard-panel" Outlined="true">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <div>
+                        <MudText Typo="Typo.h6">Service readiness</MudText>
+                        <MudText Typo="Typo.body2" Class="starter-muted">Local Aspire resources expected by this starter.</MudText>
+                    </div>
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">Healthy path</MudChip>
+                </MudStack>
+
+                <MudTable Items="Services" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Resource</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Endpoint</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Resource">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@context.Icon" Size="Size.Small" Color="@context.Color" />
+                                <strong>@context.Name</strong>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Role">@context.Role</MudTd>
+                        <MudTd DataLabel="Status">
+                            <span class="dev-dashboard-status">@context.Status</span>
+                        </MudTd>
+                        <MudTd DataLabel="Endpoint">@context.Endpoint</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudPaper Class="pa-4 dev-dashboard-panel" Outlined="true">
+                <MudText Typo="Typo.h6" GutterBottom="true">Release checklist</MudText>
+                <MudList T="DashboardTask" Dense="true" Class="dev-dashboard-task-list">
+                    @foreach (var task in Tasks)
+                    {
+                        <MudListItem Icon="@task.Icon">
+                            <MudText Typo="Typo.subtitle2">@task.Title</MudText>
+                            <MudText Typo="Typo.body2" Class="starter-muted">@task.Description</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4 dev-dashboard-panel" Outlined="true">
+                <MudText Typo="Typo.h6" GutterBottom="true">Account posture</MudText>
+                <div class="dev-dashboard-progress-row">
+                    <span>Seeded roles</span>
+                    <MudProgressLinear Value="100" Color="Color.Success" Rounded="true" />
+                </div>
+                <div class="dev-dashboard-progress-row">
+                    <span>Email flows</span>
+                    <MudProgressLinear Value="85" Color="Color.Info" Rounded="true" />
+                </div>
+                <div class="dev-dashboard-progress-row">
+                    <span>Production hardening</span>
+                    <MudProgressLinear Value="55" Color="Color.Warning" Rounded="true" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4 dev-dashboard-panel" Outlined="true">
+                <MudText Typo="Typo.h6" GutterBottom="true">Recent activity</MudText>
+                <MudTimeline TimelinePosition="TimelinePosition.Start" TimelineOrientation="TimelineOrientation.Vertical">
+                    @foreach (var item in Activity)
+                    {
+                        <MudTimelineItem Color="@item.Color" Size="Size.Small">
+                            <ItemContent>
+                                <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                                <MudText Typo="Typo.body2" Class="starter-muted">@item.Description</MudText>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private static readonly DashboardMetric[] Metrics =
+    [
+        new("8", "Resources", "AppHost-managed services", "+3", "trend-good", Icons.Material.Filled.Hub, "metric-primary"),
+        new("3", "Seed users", "Admin, manager, user", "Ready", "trend-good", Icons.Material.Filled.Groups, "metric-green"),
+        new("6", "Admin areas", "Users, roles, permissions, features, system", "Mapped", "trend-info", Icons.Material.Filled.AdminPanelSettings, "metric-blue"),
+        new("1", "CRUD slice", "Shared DTO + API + Blazor page", "Copy", "trend-info", Icons.Material.Filled.TableRows, "metric-slate"),
+    ];
+
+    private static readonly DashboardService[] Services =
+    [
+        new("webfrontend", "Blazor UI", "Healthy", "https://localhost:7131", Icons.Material.Filled.Web, Color.Primary),
+        new("apiservice", "Minimal API", "Healthy", "https://localhost:7313", Icons.Material.Filled.Api, Color.Info),
+        new("starterdb", "PostgreSQL database", "Healthy", "starterdb", Icons.Material.Filled.Storage, Color.Success),
+        new("cache", "Redis output cache", "Healthy", "cache", Icons.Material.Filled.Memory, Color.Warning),
+        new("smtp4dev", "Local email inbox", "Healthy", "http://localhost:5080", Icons.Material.Filled.MarkEmailRead, Color.Secondary),
+    ];
+
+    private static readonly DashboardTask[] Tasks =
+    [
+        new("Replace starter branding", "Update app name, README, screenshots, and package metadata.", Icons.Material.Filled.Badge),
+        new("Choose auth defaults", "Set self registration and email confirmation defaults for your target audience.", Icons.Material.Filled.VerifiedUser),
+        new("Add first module", "Copy the CRUD slice and rename DTOs, endpoints, entity, page, and nav entry.", Icons.Material.Filled.AddCircle),
+        new("Publish safely", "Keep Docker-heavy smoke tests local or manually triggered in public CI.", Icons.Material.Filled.RocketLaunch),
+    ];
+
+    private static readonly DashboardActivity[] Activity =
+    [
+        new("Migration service completed", "Schema and seed data are owned by the dedicated migration worker.", Color.Success),
+        new("Email capture configured", "smtp4dev is wired through system configuration in Development.", Color.Info),
+        new("Admin module enabled", "Role and permission policies protect administrative pages.", Color.Primary),
+        new("Template polish applied", "Workspace, navigation, README, CI, and screenshot are publication-ready.", Color.Warning),
+    ];
+
+    private sealed record DashboardMetric(
+        string Value,
+        string Label,
+        string Caption,
+        string Trend,
+        string TrendClass,
+        string Icon,
+        string IconClass);
+
+    private sealed record DashboardService(
+        string Name,
+        string Role,
+        string Status,
+        string Endpoint,
+        string Icon,
+        Color Color);
+
+    private sealed record DashboardTask(string Title, string Description, string Icon);
+    private sealed record DashboardActivity(string Title, string Description, Color Color);
+}
