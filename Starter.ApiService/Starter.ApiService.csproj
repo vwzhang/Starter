@@ -8,10 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Starter.ServiceDefaults\Starter.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Starter.Shared\Starter.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <PackageReference Include="Aspire.Npgsql" Version="13.4.0" />
   </ItemGroup>
 
 </Project>

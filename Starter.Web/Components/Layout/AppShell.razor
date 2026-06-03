@@ -1,3 +1,4 @@
+@inject NavigationManager Navigation
 @inject ShellStateService Shell
 
 @* MudBlazor providers — rendered once for the whole app. *@
@@ -13,8 +14,33 @@
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit"
                            Edge="Edge.Start" OnClick="ToggleDrawer" aria-label="Toggle navigation" />
         }
-        <MudText Typo="Typo.h6" Class="ml-2">Starter</MudText>
+        <div class="appbar-brand">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesomeMosaic" Size="Size.Medium" />
+            <span>Starter</span>
+        </div>
         <MudSpacer />
+        <AuthorizeView>
+            <Authorized Context="authState">
+                <div class="appbar-auth">
+                    <MudText Typo="Typo.caption" Class="appbar-auth-status">
+                        Signed in as @GetDisplayName(authState.User)
+                    </MudText>
+                    <form method="post" action="/admin/sign-out" class="appbar-auth-form">
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Logout">
+                            Sign out
+                        </MudButton>
+                    </form>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="appbar-auth">
+                    <MudText Typo="Typo.caption" Class="appbar-auth-status">Guest</MudText>
+                    <MudButton Href="@LoginHref" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login">
+                        Login
+                    </MudButton>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
         <MudIconButton Color="Color.Inherit" OnClick="ToggleDarkMode"
                        Icon="@(Shell.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        aria-label="Toggle dark mode" />
@@ -41,6 +67,25 @@
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
+    private string LoginHref => $"/admin/login?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+
+    private string LocalReturnUrl
+    {
+        get
+        {
+            var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+            return string.IsNullOrWhiteSpace(relativePath) ? "/" : "/" + relativePath;
+        }
+    }
+
     private void ToggleDrawer() => Shell.DrawerOpen = !Shell.DrawerOpen;
     private void ToggleDarkMode() => Shell.IsDarkMode = !Shell.IsDarkMode;
+
+    private static string GetDisplayName(ClaimsPrincipal user)
+    {
+        return user.Identity?.Name
+            ?? user.FindFirst("name")?.Value
+            ?? user.FindFirst("email")?.Value
+            ?? "user";
+    }
 }

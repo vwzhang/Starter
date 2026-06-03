@@ -1,0 +1,265 @@
+@page "/dev/crud"
+@inject DevTodoApiClient TodoApi
+@inject ISnackbar Snackbar
+
+<PageTitle>CRUD</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <div>
+            <MudText Typo="Typo.h4">CRUD</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Dev todo module</MudText>
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync" Disabled="IsLoading">
+            Refresh
+        </MudButton>
+    </MudStack>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">@ErrorMessage</MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.subtitle1">@(Form.Id is null ? "New todo" : "Edit todo")</MudText>
+                    <MudTextField Label="Title" @bind-Value="Form.Title" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="140" />
+                    <MudTextField Label="Notes" @bind-Value="Form.Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" MaxLength="1000" />
+                    <MudSelect T="DevTodoStatus" Label="Status" @bind-Value="Form.Status" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var status in Statuses)
+                        {
+                            <MudSelectItem T="DevTodoStatus" Value="@status">@GetStatusLabel(status)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudDatePicker Label="Due date" @bind-Date="Form.DueDate" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
+                    <MudNumericField T="int" Label="Sort order" @bind-Value="Form.SortOrder" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="IsSaving">
+                            Save
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Clear" OnClick="ResetForm">
+                            Clear
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="dev-crud-filterbar">
+                        <MudTextField Label="Search" @bind-Value="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                        <MudSelect T="DevTodoStatus?" Label="Status" @bind-Value="StatusFilter" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                            @foreach (var status in Statuses)
+                            {
+                                <MudSelectItem T="DevTodoStatus?" Value="@((DevTodoStatus?)status)">@GetStatusLabel(status)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="LoadAsync" Disabled="IsLoading">
+                            Apply
+                        </MudButton>
+                    </MudStack>
+
+                    <MudTable Items="Items" Dense="true" Hover="true" Elevation="0" Loading="IsLoading">
+                        <HeaderContent>
+                            <MudTh>Title</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Due</MudTh>
+                            <MudTh>Order</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="item">
+                            <MudTd DataLabel="Title">
+                                <div class="dev-crud-title">@item.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="dev-crud-notes">@item.Notes</div>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Status">
+                                <span class="@GetStatusClass(item.Status)">@GetStatusLabel(item.Status)</span>
+                            </MudTd>
+                            <MudTd DataLabel="Due">@FormatDueDate(item.DueDate)</MudTd>
+                            <MudTd DataLabel="Order">@item.SortOrder</MudTd>
+                            <MudTd>
+                                <MudTooltip Text="Edit">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => Edit(item))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Delete">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(item.Id))" />
+                                </MudTooltip>
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">No todo items.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private static readonly DevTodoStatus[] Statuses = Enum.GetValues<DevTodoStatus>();
+
+    private IReadOnlyList<DevTodoItemDto> Items { get; set; } = [];
+    private DevTodoFormModel Form { get; set; } = new();
+    private string? Search { get; set; }
+    private DevTodoStatus? StatusFilter { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+    private bool IsSaving { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        ResetForm();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            Items = await TodoApi.GetTodosAsync(Search, StatusFilter);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Form.Title))
+        {
+            Snackbar.Add("Title is required.", Severity.Error);
+            return;
+        }
+
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var request = new DevTodoSaveRequest(
+                Form.Title,
+                Form.Notes,
+                Form.Status,
+                Form.DueDate is null ? null : DateOnly.FromDateTime(Form.DueDate.Value),
+                Form.SortOrder);
+
+            if (Form.Id is Guid id)
+            {
+                await TodoApi.UpdateAsync(id, request);
+                Snackbar.Add("Todo updated.", Severity.Success);
+            }
+            else
+            {
+                await TodoApi.CreateAsync(request);
+                Snackbar.Add("Todo created.", Severity.Success);
+            }
+
+            await LoadAsync();
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Edit(DevTodoItemDto item)
+    {
+        Form = new DevTodoFormModel
+        {
+            Id = item.Id,
+            Title = item.Title,
+            Notes = item.Notes,
+            Status = item.Status,
+            DueDate = item.DueDate?.ToDateTime(TimeOnly.MinValue),
+            SortOrder = item.SortOrder,
+        };
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        try
+        {
+            await TodoApi.DeleteAsync(id);
+            Snackbar.Add("Todo deleted.", Severity.Success);
+
+            if (Form.Id == id)
+            {
+                ResetForm();
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private void ResetForm()
+    {
+        Form = new DevTodoFormModel
+        {
+            SortOrder = Items.Count + 1,
+        };
+    }
+
+    private static string FormatDueDate(DateOnly? dueDate)
+    {
+        return dueDate?.ToString("yyyy-MM-dd") ?? "-";
+    }
+
+    private static string GetStatusLabel(DevTodoStatus status)
+    {
+        return status switch
+        {
+            DevTodoStatus.InProgress => "In progress",
+            DevTodoStatus.Done => "Done",
+            _ => "Backlog",
+        };
+    }
+
+    private static string GetStatusClass(DevTodoStatus status)
+    {
+        return status switch
+        {
+            DevTodoStatus.InProgress => "dev-crud-status dev-crud-status-progress",
+            DevTodoStatus.Done => "dev-crud-status dev-crud-status-done",
+            _ => "dev-crud-status dev-crud-status-backlog",
+        };
+    }
+
+    private sealed class DevTodoFormModel
+    {
+        public Guid? Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+        public DevTodoStatus Status { get; set; } = DevTodoStatus.Backlog;
+        public DateTime? DueDate { get; set; }
+        public int SortOrder { get; set; } = 1;
+    }
+}

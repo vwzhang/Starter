@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Starter.AppHost\Starter.AppHost.csproj" />
+    <ProjectReference Include="..\Starter.Shared\Starter.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

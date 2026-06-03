@@ -9,6 +9,9 @@
 .vs/
 .vscode/
 .idea/
+.claude/
+.codex/
+.playwright-cli/
 *.user
 *.suo
 *.userosscache

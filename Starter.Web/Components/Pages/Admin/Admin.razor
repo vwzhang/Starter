@@ -1,0 +1,681 @@
+@page "/admin"
+@attribute [Authorize(Policy = AdminPolicies.AccessAdmin)]
+@inject AdminIdentityService AdminIdentity
+@inject SystemConfigurationService SystemConfiguration
+@inject IAuthorizationService AuthorizationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <div>
+            <MudText Typo="Typo.h4">Admin</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Users, roles, permissions, feature flags, and system settings.</MudText>
+        </div>
+        <MudSpacer />
+        <form method="post" action="/admin/sign-out">
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Logout">
+                Sign out
+            </MudButton>
+        </form>
+    </MudStack>
+
+    <MudTabs Rounded="true" Border="true" Elevation="0">
+        <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Filled.Dashboard">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Users</MudText>
+                        <MudText Typo="Typo.h4">@Dashboard?.UserCount</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Roles</MudText>
+                        <MudText Typo="Typo.h4">@Dashboard?.RoleCount</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Permissions</MudText>
+                        <MudText Typo="Typo.h4">@Dashboard?.PermissionCount</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Features</MudText>
+                        <MudText Typo="Typo.h4">@Dashboard?.FeatureCount</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudPaper Class="pa-4 mt-4" Outlined="true">
+                <MudText Typo="Typo.subtitle1" GutterBottom="true">Seeded test accounts</MudText>
+                <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Password</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                        <MudTd DataLabel="Role">@context.Role</MudTd>
+                        <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudTabPanel>
+
+        @if (CanManageUsers)
+        {
+                <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.Group">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudText Typo="Typo.subtitle1" GutterBottom="true">@(string.IsNullOrWhiteSpace(UserForm.Id) ? "New user" : "Edit user")</MudText>
+                                <MudStack Spacing="2">
+                                    <MudTextField Label="Email" @bind-Value="UserForm.Email" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Display name" @bind-Value="UserForm.DisplayName" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Password" @bind-Value="UserForm.Password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" />
+                                    <MudSwitch T="bool" @bind-Value="UserForm.IsActive" Label="Active" Color="Color.Primary" />
+
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Roles</MudText>
+                                    @foreach (var role in Roles)
+                                    {
+                                        <label class="admin-check-row">
+                                            <input type="checkbox" checked="@SelectedUserRoleIds.Contains(role.Id)" @onchange="args => ToggleUserRole(role.Id, args)" />
+                                            <span>@role.Name</span>
+                                        </label>
+                                    }
+
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUserAsync" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="ResetUserForm">Clear</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudTable Items="Users" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Email</MudTh>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Roles</MudTh>
+                                        <MudTh>Status</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="user">
+                                        <MudTd DataLabel="Email">@user.Email</MudTd>
+                                        <MudTd DataLabel="Name">@user.DisplayName</MudTd>
+                                        <MudTd DataLabel="Roles">@string.Join(", ", user.Roles)</MudTd>
+                                        <MudTd DataLabel="Status">@(user.IsActive ? "Active" : "Disabled")</MudTd>
+                                        <MudTd>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditUserAsync(user))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteUserAsync(user.Id))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+        }
+
+        @if (CanManageRoles)
+        {
+                <MudTabPanel Text="Roles" Icon="@Icons.Material.Filled.Badge">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudText Typo="Typo.subtitle1" GutterBottom="true">@(string.IsNullOrWhiteSpace(RoleForm.Id) ? "New role" : "Edit role")</MudText>
+                                <MudStack Spacing="2">
+                                    <MudTextField Label="Name" @bind-Value="RoleForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Description" @bind-Value="RoleForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" />
+
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Permissions</MudText>
+                                    @foreach (var permission in Permissions)
+                                    {
+                                        <label class="admin-check-row">
+                                            <input type="checkbox" checked="@SelectedPermissionIds.Contains(permission.Id)" @onchange="args => TogglePermission(permission.Id, args)" />
+                                            <span>@permission.Name <small>@permission.Key</small></span>
+                                        </label>
+                                    }
+
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveRoleAsync" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="ResetRoleForm">Clear</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudTable Items="Roles" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Description</MudTh>
+                                        <MudTh>Permissions</MudTh>
+                                        <MudTh>Users</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="role">
+                                        <MudTd DataLabel="Name">@role.Name</MudTd>
+                                        <MudTd DataLabel="Description">@role.Description</MudTd>
+                                        <MudTd DataLabel="Permissions">@role.PermissionCount</MudTd>
+                                        <MudTd DataLabel="Users">@role.UserCount</MudTd>
+                                        <MudTd>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditRoleAsync(role))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Disabled="@role.IsAdministrator" OnClick="@(() => DeleteRoleAsync(role.Id))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+        }
+
+        @if (CanManagePermissions)
+        {
+                <MudTabPanel Text="Permissions" Icon="@Icons.Material.Filled.Key">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudText Typo="Typo.subtitle1" GutterBottom="true">@(PermissionForm.Id is null ? "New permission" : "Edit permission")</MudText>
+                                <MudStack Spacing="2">
+                                    <MudTextField Label="Key" @bind-Value="PermissionForm.Key" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Name" @bind-Value="PermissionForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Description" @bind-Value="PermissionForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" />
+                                    <MudSelect T="int" Label="Feature" @bind-Value="PermissionForm.FeatureId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                        @foreach (var feature in Features)
+                                        {
+                                            <MudSelectItem T="int" Value="@feature.Id">@feature.Name</MudSelectItem>
+                                        }
+                                    </MudSelect>
+
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePermissionAsync" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="ResetPermissionForm">Clear</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudTable Items="Permissions" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Key</MudTh>
+                                        <MudTh>Feature</MudTh>
+                                        <MudTh>Roles</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="permission">
+                                        <MudTd DataLabel="Name">@permission.Name</MudTd>
+                                        <MudTd DataLabel="Key"><code>@permission.Key</code></MudTd>
+                                        <MudTd DataLabel="Feature">@permission.FeatureName</MudTd>
+                                        <MudTd DataLabel="Roles">@permission.RoleCount</MudTd>
+                                        <MudTd>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditPermission(permission))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeletePermissionAsync(permission.Id))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+        }
+
+        @if (CanManageFeatures)
+        {
+                <MudTabPanel Text="Features" Icon="@Icons.Material.Filled.Tune">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudText Typo="Typo.subtitle1" GutterBottom="true">@(FeatureForm.Id is null ? "New feature" : "Edit feature")</MudText>
+                                <MudStack Spacing="2">
+                                    <MudTextField Label="Key" @bind-Value="FeatureForm.Key" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Name" @bind-Value="FeatureForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField Label="Description" @bind-Value="FeatureForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" />
+                                    <MudSwitch T="bool" @bind-Value="FeatureForm.IsEnabled" Label="Enabled" Color="Color.Primary" />
+
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveFeatureAsync" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="ResetFeatureForm">Clear</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudTable Items="Features" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Key</MudTh>
+                                        <MudTh>Status</MudTh>
+                                        <MudTh>Permissions</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="feature">
+                                        <MudTd DataLabel="Name">@feature.Name</MudTd>
+                                        <MudTd DataLabel="Key"><code>@feature.Key</code></MudTd>
+                                        <MudTd DataLabel="Status">@(feature.IsEnabled ? "Enabled" : "Disabled")</MudTd>
+                                        <MudTd DataLabel="Permissions">@feature.PermissionCount</MudTd>
+                                        <MudTd>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditFeature(feature))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteFeatureAsync(feature.Id))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+        }
+
+        @if (CanManageSystem)
+        {
+                <MudTabPanel Text="System" Icon="@Icons.Material.Filled.Settings">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudText Typo="Typo.subtitle1" GutterBottom="true">@(SystemSettingForm.Id is null ? "Select setting" : "Edit setting")</MudText>
+                                <MudStack Spacing="2">
+                                    <MudTextField Label="Name" @bind-Value="SystemSettingForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="true" />
+                                    <MudTextField Label="Key" @bind-Value="SystemSettingForm.Key" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="true" />
+                                    <MudTextField Label="Category" @bind-Value="SystemSettingForm.Category" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="true" />
+
+                                    @if (SystemSettingForm.ValueType == SystemConfigurationValueTypes.Boolean)
+                                    {
+                                        <MudSwitch T="bool" @bind-Value="SystemSettingBooleanValue" Label="Enabled" Color="Color.Primary" Disabled="@(SystemSettingForm.Id is null)" />
+                                    }
+                                    else
+                                    {
+                                        <MudTextField Label="Value" @bind-Value="SystemSettingForm.Value" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="@GetSystemSettingInputType()" Disabled="@(SystemSettingForm.Id is null)" />
+                                    }
+
+                                    <MudTextField Label="Description" @bind-Value="SystemSettingForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" Disabled="true" />
+
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSystemSettingAsync" StartIcon="@Icons.Material.Filled.Save" Disabled="@(SystemSettingForm.Id is null)">Save</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="ResetSystemSettingForm">Clear</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="pa-4" Outlined="true">
+                                <MudTable Items="SystemSettings" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Category</MudTh>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Value</MudTh>
+                                        <MudTh>Description</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="setting">
+                                        <MudTd DataLabel="Category">@setting.Category</MudTd>
+                                        <MudTd DataLabel="Name">
+                                            @setting.Name
+                                            <small>@setting.Key</small>
+                                        </MudTd>
+                                        <MudTd DataLabel="Value">@FormatSystemSettingValue(setting)</MudTd>
+                                        <MudTd DataLabel="Description">@setting.Description</MudTd>
+                                        <MudTd>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditSystemSetting(setting))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+        }
+    </MudTabs>
+</MudStack>
+
+@code {
+    private AdminDashboardSummary? Dashboard { get; set; }
+    private IReadOnlyList<FeatureSummary> Features { get; set; } = [];
+    private IReadOnlyList<PermissionSummary> Permissions { get; set; } = [];
+    private IReadOnlyList<RoleSummary> Roles { get; set; } = [];
+    private IReadOnlyList<UserSummary> Users { get; set; } = [];
+    private IReadOnlyList<SystemConfigurationSummary> SystemSettings { get; set; } = [];
+    private FeatureFormModel FeatureForm { get; set; } = new();
+    private PermissionFormModel PermissionForm { get; set; } = new();
+    private RoleFormModel RoleForm { get; set; } = new();
+    private UserFormModel UserForm { get; set; } = new();
+    private SystemConfigurationFormModel SystemSettingForm { get; set; } = new();
+    private HashSet<int> SelectedPermissionIds { get; } = [];
+    private HashSet<string> SelectedUserRoleIds { get; } = [];
+    private bool SystemSettingBooleanValue { get; set; }
+    private bool CanManageUsers { get; set; }
+    private bool CanManageRoles { get; set; }
+    private bool CanManagePermissions { get; set; }
+    private bool CanManageFeatures { get; set; }
+    private bool CanManageSystem { get; set; }
+
+    private static readonly SeedAccount[] SeedAccounts =
+    [
+        new("admin@starter.local", "Administrator"),
+        new("manager@starter.local", "Manager"),
+        new("user@starter.local", "User"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuthorizationAsync();
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAuthorizationAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+
+        CanManageUsers = (await AuthorizationService.AuthorizeAsync(user, AdminPolicies.ManageUsers)).Succeeded;
+        CanManageRoles = (await AuthorizationService.AuthorizeAsync(user, AdminPolicies.ManageRoles)).Succeeded;
+        CanManagePermissions = (await AuthorizationService.AuthorizeAsync(user, AdminPolicies.ManagePermissions)).Succeeded;
+        CanManageFeatures = (await AuthorizationService.AuthorizeAsync(user, AdminPolicies.ManageFeatures)).Succeeded;
+        CanManageSystem = (await AuthorizationService.AuthorizeAsync(user, AdminPolicies.ManageSystem)).Succeeded;
+    }
+
+    private async Task LoadAllAsync()
+    {
+        Dashboard = await AdminIdentity.GetDashboardAsync();
+        Features = await AdminIdentity.GetFeaturesAsync();
+        Permissions = await AdminIdentity.GetPermissionsAsync();
+        Roles = await AdminIdentity.GetRolesAsync();
+        Users = await AdminIdentity.GetUsersAsync();
+        SystemSettings = CanManageSystem
+            ? await SystemConfiguration.GetSettingsAsync()
+            : [];
+
+        if (PermissionForm.FeatureId == 0)
+        {
+            PermissionForm.FeatureId = Features.FirstOrDefault()?.Id ?? 0;
+        }
+    }
+
+    private async Task SaveFeatureAsync()
+    {
+        var result = await AdminIdentity.SaveFeatureAsync(FeatureForm);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetFeatureForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void EditFeature(FeatureSummary feature)
+    {
+        FeatureForm = new FeatureFormModel
+        {
+            Id = feature.Id,
+            Key = feature.Key,
+            Name = feature.Name,
+            Description = feature.Description,
+            IsEnabled = feature.IsEnabled,
+        };
+    }
+
+    private async Task DeleteFeatureAsync(int id)
+    {
+        var result = await AdminIdentity.DeleteFeatureAsync(id);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetFeatureForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void ResetFeatureForm()
+    {
+        FeatureForm = new FeatureFormModel();
+    }
+
+    private async Task SavePermissionAsync()
+    {
+        var result = await AdminIdentity.SavePermissionAsync(PermissionForm);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetPermissionForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void EditPermission(PermissionSummary permission)
+    {
+        PermissionForm = new PermissionFormModel
+        {
+            Id = permission.Id,
+            Key = permission.Key,
+            Name = permission.Name,
+            Description = permission.Description,
+            FeatureId = permission.FeatureId,
+        };
+    }
+
+    private async Task DeletePermissionAsync(int id)
+    {
+        var result = await AdminIdentity.DeletePermissionAsync(id);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetPermissionForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void ResetPermissionForm()
+    {
+        PermissionForm = new PermissionFormModel
+        {
+            FeatureId = Features.FirstOrDefault()?.Id ?? 0,
+        };
+    }
+
+    private async Task SaveRoleAsync()
+    {
+        var result = await AdminIdentity.SaveRoleAsync(RoleForm, SelectedPermissionIds);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetRoleForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private async Task EditRoleAsync(RoleSummary role)
+    {
+        RoleForm = new RoleFormModel
+        {
+            Id = role.Id,
+            Name = role.Name,
+            Description = role.Description,
+        };
+        SelectedPermissionIds.Clear();
+
+        foreach (var permissionId in await AdminIdentity.GetRolePermissionIdsAsync(role.Id))
+        {
+            SelectedPermissionIds.Add(permissionId);
+        }
+    }
+
+    private async Task DeleteRoleAsync(string id)
+    {
+        var result = await AdminIdentity.DeleteRoleAsync(id);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetRoleForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void ResetRoleForm()
+    {
+        RoleForm = new RoleFormModel();
+        SelectedPermissionIds.Clear();
+    }
+
+    private async Task SaveUserAsync()
+    {
+        var result = await AdminIdentity.SaveUserAsync(UserForm, SelectedUserRoleIds);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetUserForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private async Task EditUserAsync(UserSummary user)
+    {
+        UserForm = new UserFormModel
+        {
+            Id = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            IsActive = user.IsActive,
+        };
+        SelectedUserRoleIds.Clear();
+
+        foreach (var roleId in await AdminIdentity.GetUserRoleIdsAsync(user.Id))
+        {
+            SelectedUserRoleIds.Add(roleId);
+        }
+    }
+
+    private async Task DeleteUserAsync(string id)
+    {
+        var result = await AdminIdentity.DeleteUserAsync(id);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetUserForm();
+            await LoadAllAsync();
+        }
+    }
+
+    private void ResetUserForm()
+    {
+        UserForm = new UserFormModel();
+        SelectedUserRoleIds.Clear();
+    }
+
+    private async Task SaveSystemSettingAsync()
+    {
+        if (SystemSettingForm.ValueType == SystemConfigurationValueTypes.Boolean)
+        {
+            SystemSettingForm.Value = SystemSettingBooleanValue.ToString().ToLowerInvariant();
+        }
+
+        var result = await SystemConfiguration.SaveSettingAsync(SystemSettingForm);
+        Notify(result);
+
+        if (result.Succeeded)
+        {
+            ResetSystemSettingForm();
+            SystemSettings = await SystemConfiguration.GetSettingsAsync();
+        }
+    }
+
+    private void EditSystemSetting(SystemConfigurationSummary setting)
+    {
+        SystemSettingForm = new SystemConfigurationFormModel
+        {
+            Id = setting.Id,
+            Key = setting.Key,
+            Name = setting.Name,
+            Category = setting.Category,
+            Value = setting.Value,
+            ValueType = setting.ValueType,
+            Description = setting.Description,
+        };
+        if (setting.ValueType == SystemConfigurationValueTypes.Secret)
+        {
+            SystemSettingForm.Value = string.Empty;
+        }
+
+        SystemSettingBooleanValue = bool.TryParse(setting.Value, out var enabled) && enabled;
+    }
+
+    private void ResetSystemSettingForm()
+    {
+        SystemSettingForm = new SystemConfigurationFormModel();
+        SystemSettingBooleanValue = false;
+    }
+
+    private static string FormatSystemSettingValue(SystemConfigurationSummary setting)
+    {
+        if (setting.ValueType == SystemConfigurationValueTypes.Secret)
+        {
+            return string.IsNullOrWhiteSpace(setting.Value) ? "Not configured" : "Configured";
+        }
+
+        if (setting.ValueType == SystemConfigurationValueTypes.Boolean)
+        {
+            return bool.TryParse(setting.Value, out var enabled) && enabled ? "Enabled" : "Disabled";
+        }
+
+        return string.IsNullOrWhiteSpace(setting.Value) ? "Not configured" : setting.Value;
+    }
+
+    private InputType GetSystemSettingInputType()
+    {
+        return SystemSettingForm.ValueType switch
+        {
+            SystemConfigurationValueTypes.Number => InputType.Number,
+            SystemConfigurationValueTypes.Secret => InputType.Password,
+            _ => InputType.Text,
+        };
+    }
+
+    private void TogglePermission(int permissionId, ChangeEventArgs args)
+    {
+        ToggleSetValue(SelectedPermissionIds, permissionId, args);
+    }
+
+    private void ToggleUserRole(string roleId, ChangeEventArgs args)
+    {
+        ToggleSetValue(SelectedUserRoleIds, roleId, args);
+    }
+
+    private static void ToggleSetValue<T>(HashSet<T> values, T value, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool checkedValue
+            ? checkedValue
+            : bool.TryParse(args.Value?.ToString(), out var parsedValue) && parsedValue;
+
+        if (isChecked)
+        {
+            values.Add(value);
+        }
+        else
+        {
+            values.Remove(value);
+        }
+    }
+
+    private void Notify(AdminMutationResult result)
+    {
+        Snackbar.Add(result.Message, result.Succeeded ? Severity.Success : Severity.Error);
+    }
+
+    private sealed record SeedAccount(string Email, string Role);
+}

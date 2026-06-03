@@ -1,5 +1,7 @@
 @inject NavRegistry Registry
 @inject ShellStateService Shell
+@inject NavigationManager Navigation
+@implements IDisposable
 
 <div class="nav-shell">
     @if (Registry.Modules.Count > 1)
@@ -28,4 +30,41 @@
 
 @code {
     private NavModule ActiveModule => Registry.Modules[Shell.ActiveModuleIndex];
+
+    protected override void OnInitialized()
+    {
+        SyncActiveModuleWithUrl();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        SyncActiveModuleWithUrl();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void SyncActiveModuleWithUrl()
+    {
+        var relativePath = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+        var moduleTitle = relativePath.StartsWith("/dev", StringComparison.OrdinalIgnoreCase)
+            ? "Dev"
+            : relativePath.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
+                || relativePath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
+                    ? "Admin"
+                    : "Demo";
+
+        var index = Registry.Modules
+            .Select((module, moduleIndex) => new { module.Title, Index = moduleIndex })
+            .FirstOrDefault(module => module.Title == moduleTitle)?.Index;
+
+        if (index is not null)
+        {
+            Shell.ActiveModuleIndex = index.Value;
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
 }

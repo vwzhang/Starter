@@ -1,0 +1,15 @@
+@page "/admin/access-denied"
+@layout BlankLayout
+
+<PageTitle>Access Denied</PageTitle>
+
+<MudPaper Class="pa-6 admin-login-panel" Outlined="true">
+    <MudStack Spacing="3">
+        <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Error" Size="Size.Large" />
+        <MudText Typo="Typo.h4">Access denied</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">This account does not have permission to open the requested admin area.</MudText>
+        <MudButton Href="/admin/login" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Login">
+            Sign in as another user
+        </MudButton>
+    </MudStack>
+</MudPaper>

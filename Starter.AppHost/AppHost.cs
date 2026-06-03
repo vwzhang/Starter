@@ -1,16 +1,62 @@
+using Aspire.Hosting.ApplicationModel;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var cache = builder.AddRedis("cache");
 
+var smtp4dev = builder.AddContainer("smtp4dev", "rnwood/smtp4dev")
+    .WithHttpEndpoint(targetPort: 80, port: 5080)
+    .WithEndpoint(targetPort: 25, scheme: "tcp", name: "smtp")
+    .WithHttpHealthCheck("/");
+
+var smtpEndpoint = smtp4dev.GetEndpoint("smtp");
+
+// PostgreSQL 18 server with a persistent data volume and pgAdmin dashboard.
+var postgres = builder.AddPostgres("postgres")
+    .WithImageTag("18")
+    .WithDataVolume();
+
+postgres.WithPgAdmin(pgAdmin =>
+{
+    pgAdmin
+        .WithHostPort(5050)
+        .WaitFor(postgres);
+
+    foreach (var healthCheck in pgAdmin.Resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())
+    {
+        pgAdmin.Resource.Annotations.Remove(healthCheck);
+    }
+
+    pgAdmin.WithHttpHealthCheck("/misc/ping");
+}, "pgadmin");
+
+// Shared "starter" database consumed by both the API service and the web frontend.
+var starterDb = postgres.AddDatabase("starterdb");
+
+var migrations = builder.AddProject<Projects.Starter_MigrationService>("migrations")
+    .WithReference(starterDb)
+    .WithEnvironment("Starter__Email__SmtpHost", ReferenceExpression.Create($"{smtpEndpoint.Property(EndpointProperty.Host)}"))
+    .WithEnvironment("Starter__Email__SmtpPort", ReferenceExpression.Create($"{smtpEndpoint.Property(EndpointProperty.Port)}"))
+    .WaitFor(starterDb);
+
 var apiService = builder.AddProject<Projects.Starter_ApiService>("apiservice")
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithReference(starterDb)
+    .WaitFor(starterDb)
+    .WaitForCompletion(migrations);
 
 builder.AddProject<Projects.Starter_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(cache)
     .WaitFor(cache)
+    .WithEnvironment("Starter__Email__SmtpHost", ReferenceExpression.Create($"{smtpEndpoint.Property(EndpointProperty.Host)}"))
+    .WithEnvironment("Starter__Email__SmtpPort", ReferenceExpression.Create($"{smtpEndpoint.Property(EndpointProperty.Port)}"))
+    .WaitFor(smtp4dev)
     .WithReference(apiService)
-    .WaitFor(apiService);
+    .WaitFor(apiService)
+    .WithReference(starterDb)
+    .WaitFor(starterDb)
+    .WaitForCompletion(migrations);
 
 builder.Build().Run();

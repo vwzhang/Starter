@@ -1,4 +1,5 @@
 using MudBlazor;
+using Starter.Web.Components.Pages.Admin;
 using Starter.Web.Components.Pages.Demo;
 using Starter.Web.Components.Pages.Dev;
 
@@ -19,6 +20,7 @@ public sealed class NavRegistry
     public IReadOnlyList<NavModule> Modules { get; } =
     [
         new("Demo", Icons.Material.Filled.Widgets, typeof(DemoNav)),
+        new("Admin", Icons.Material.Filled.AdminPanelSettings, typeof(AdminNav)),
         new("Dev", Icons.Material.Filled.Code, typeof(DevNav)),
     ];
 }

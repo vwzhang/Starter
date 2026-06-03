@@ -1,7 +1,157 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Starter Workspace</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudStack Spacing="4" Class="starter-home">
+    <section class="starter-hero">
+        <div class="starter-hero-copy">
+            <MudText Typo="Typo.overline" Class="starter-kicker">Enhanced Aspire starter</MudText>
+            <MudText Typo="Typo.h3" HtmlTag="h1" Class="starter-title">Starter Workspace</MudText>
+            <MudText Typo="Typo.body1" Class="starter-lead">
+                A ready-to-run .NET Aspire baseline with identity, admin modules, PostgreSQL, Redis, email capture, shared DTOs, migrations, and development CRUD.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="starter-actions">
+                <MudButton Href="/admin" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AdminPanelSettings">
+                    Open admin
+                </MudButton>
+                <MudButton Href="/dev/crud" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableRows">
+                    Try CRUD
+                </MudButton>
+                <MudButton Href="/weather" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Cloud">
+                    API sample
+                </MudButton>
+            </MudStack>
+        </div>
 
-Welcome to your new app.
+        <div class="starter-hero-panel" aria-label="Local services">
+            <MudText Typo="Typo.subtitle2">Local services</MudText>
+            <div class="starter-service-list">
+                @foreach (var service in LocalServices)
+                {
+                    <a class="starter-service" href="@service.Url" target="_blank" rel="noopener">
+                        <span class="starter-service-icon">
+                            <MudIcon Icon="@service.Icon" Size="Size.Small" />
+                        </span>
+                        <span>
+                            <strong>@service.Name</strong>
+                            <small>@service.Description</small>
+                        </span>
+                    </a>
+                }
+            </div>
+        </div>
+    </section>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudStack Spacing="2">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">Identity ready</MudText>
+                    <MudText Typo="Typo.body2" Class="starter-muted">
+                        Seeded roles, permissions, self registration, configurable email confirmation, and forgot password are wired for local testing.
+                    </MudText>
+                    <MudButton Href="/admin/login" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Login">
+                        Sign in
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudStack Spacing="2">
+                    <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">Data path included</MudText>
+                    <MudText Typo="Typo.body2" Class="starter-muted">
+                        The migration service owns schema setup and seed data while API and Web share PostgreSQL through Aspire service discovery.
+                    </MudText>
+                    <MudButton Href="/dev/crud" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DataObject">
+                        Inspect CRUD
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudStack Spacing="2">
+                    <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">Email without friction</MudText>
+                    <MudText Typo="Typo.body2" Class="starter-muted">
+                        smtp4dev captures account emails locally, while Admin/System holds SMTP settings for future production delivery.
+                    </MudText>
+                    <MudButton Href="http://localhost:5080" Target="_blank" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew">
+                        Open inbox
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudText Typo="Typo.h6" GutterBottom="true">Starter checklist</MudText>
+                <MudList T="ChecklistItem" Dense="true" Class="starter-checklist">
+                    @foreach (var item in Checklist)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.CheckCircle">
+                            <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                            <MudText Typo="Typo.body2" Class="starter-muted">@item.Description</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudText Typo="Typo.h6" GutterBottom="true">Development accounts</MudText>
+                <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Role</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                        <MudTd DataLabel="Role">@context.Role</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-3">
+                    Password for all seeded accounts is <code>Happy1..</code>
+                </MudAlert>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private static readonly LocalService[] LocalServices =
+    [
+        new("pgAdmin", "PostgreSQL dashboard", "http://localhost:5050", Icons.Material.Filled.Storage),
+        new("smtp4dev", "Captured outbound email", "http://localhost:5080", Icons.Material.Filled.MarkEmailRead),
+    ];
+
+    private static readonly ChecklistItem[] Checklist =
+    [
+        new("Run the full stack", "Use Aspire AppHost to start PostgreSQL, Redis, pgAdmin, smtp4dev, API, Web, and migrations together."),
+        new("Tune system settings", "Use Admin/System to configure self registration, email confirmation, public URL, and SMTP delivery."),
+        new("Replace demo slices", "Use the Dev CRUD module as the pattern for shared DTOs, Minimal API endpoints, Blazor pages, and migrations."),
+        new("Keep CI green", "The GitHub workflow builds the solution and runs the Aspire integration smoke test."),
+    ];
+
+    private static readonly SeedAccount[] SeedAccounts =
+    [
+        new("admin@starter.local", "Administrator"),
+        new("manager@starter.local", "Manager"),
+        new("user@starter.local", "User"),
+    ];
+
+    private sealed record LocalService(string Name, string Description, string Url, string Icon);
+    private sealed record ChecklistItem(string Title, string Description);
+    private sealed record SeedAccount(string Email, string Role);
+}

@@ -1,0 +1,141 @@
+@page "/admin/login"
+@layout BlankLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Admin Login</PageTitle>
+
+<MudStack Spacing="4" Class="admin-login">
+    <MudPaper Class="pa-6 admin-login-panel" Outlined="true">
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h4">Admin Login</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Use the seeded development accounts to test admin access.</MudText>
+
+            @if (Failed == "1")
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Filled">Invalid email or password.</MudAlert>
+            }
+
+            @if (Registered == "1")
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Filled">Account created. Confirm your email before signing in.</MudAlert>
+
+                @if (!string.IsNullOrWhiteSpace(ConfirmationLink))
+                {
+                    <MudTextField Label="Development confirmation link" Value="@ConfirmationLink" Variant="Variant.Outlined" ReadOnly="true" Lines="4" />
+                    <MudButton Href="@ConfirmationLink" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.MarkEmailRead">
+                        Open confirmation link
+                    </MudButton>
+                }
+            }
+
+            @if (Confirmed == "1")
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Filled">Email confirmed. Sign in to continue.</MudAlert>
+            }
+
+            @if (ConfirmFailed == "1")
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Filled">Unable to confirm email with that link.</MudAlert>
+            }
+
+            @if (ConfirmRequired == "1")
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">Confirm your email before signing in.</MudAlert>
+            }
+
+            @if (Reset == "1")
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Filled">Password reset. Sign in with the new password.</MudAlert>
+            }
+
+            <form method="post" action="@SignInAction" class="admin-login-form">
+                <input name="Email" type="email" autocomplete="username" placeholder="Email" required />
+                <input name="Password" type="password" autocomplete="current-password" placeholder="Password" required />
+                <label class="admin-check-row">
+                    <input name="RememberMe" type="checkbox" value="true" />
+                    <span>Remember me</span>
+                </label>
+                <input name="ReturnUrl" type="hidden" value="@LocalReturnUrl" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Login">
+                    Sign in
+                </MudButton>
+            </form>
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Href="/account/forgot-password" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Key">
+                    Forgot password
+                </MudButton>
+                <MudButton Href="@RegisterHref" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">
+                    Register
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 admin-login-panel" Outlined="true">
+        <MudText Typo="Typo.subtitle2" GutterBottom="true">Development accounts</MudText>
+        <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Email</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Password</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Email">@context.Email</MudTd>
+                <MudTd DataLabel="Role">@context.Role</MudTd>
+                <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+</MudStack>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "failed")]
+    public string? Failed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "registered")]
+    public string? Registered { get; set; }
+
+    [SupplyParameterFromQuery(Name = "confirmed")]
+    public string? Confirmed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "confirmFailed")]
+    public string? ConfirmFailed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "confirmRequired")]
+    public string? ConfirmRequired { get; set; }
+
+    [SupplyParameterFromQuery(Name = "confirmationLink")]
+    public string? ConfirmationLink { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reset")]
+    public string? Reset { get; set; }
+
+    private string LocalReturnUrl => GetLocalReturnUrl(ReturnUrl);
+    private string SignInAction => $"/admin/sign-in?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+    private string RegisterHref => $"/account/register?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+
+    private static readonly SeedAccount[] SeedAccounts =
+    [
+        new("admin@starter.local", "Administrator"),
+        new("manager@starter.local", "Manager"),
+        new("user@starter.local", "User"),
+    ];
+
+    private static string GetLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl)
+            || returnUrl[0] != '/'
+            || (returnUrl.Length > 1 && (returnUrl[1] == '/' || returnUrl[1] == '\\')))
+        {
+            return "/admin";
+        }
+
+        return returnUrl;
+    }
+
+    private sealed record SeedAccount(string Email, string Role);
+}

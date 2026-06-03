@@ -1,0 +1,81 @@
+@page "/account/register"
+@layout BlankLayout
+@attribute [AllowAnonymous]
+@inject SystemConfigurationService SystemConfiguration
+
+<PageTitle>Register</PageTitle>
+
+<MudStack Spacing="4" Class="admin-login">
+    <MudPaper Class="pa-6 admin-login-panel" Outlined="true">
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h4">Create account</MudText>
+
+            @if (!RegistrationEnabled || Disabled == "1")
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">Self registration is currently disabled.</MudAlert>
+            }
+            else
+            {
+                @if (Failed == "1")
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled">Unable to create account with those details.</MudAlert>
+                }
+
+                @if (EmailConfirmationRequired)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">New accounts must confirm their email before signing in.</MudAlert>
+                }
+
+                <form method="post" action="@RegisterAction" class="admin-login-form">
+                    <input name="Email" type="email" autocomplete="username" placeholder="Email" required />
+                    <input name="DisplayName" type="text" autocomplete="name" placeholder="Display name" />
+                    <input name="Password" type="password" autocomplete="new-password" placeholder="Password" required />
+                    <input name="ConfirmPassword" type="password" autocomplete="new-password" placeholder="Confirm password" required />
+                    <input name="ReturnUrl" type="hidden" value="@LocalReturnUrl" />
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">
+                        Create account
+                    </MudButton>
+                </form>
+            }
+
+            <MudButton Href="@LoginHref" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Login">
+                Sign in
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudStack>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "failed")]
+    public string? Failed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public string? Disabled { get; set; }
+
+    private bool RegistrationEnabled { get; set; }
+    private bool EmailConfirmationRequired { get; set; }
+    private string LocalReturnUrl => GetLocalReturnUrl(ReturnUrl);
+    private string RegisterAction => $"/account/register?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+    private string LoginHref => $"/admin/login?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        RegistrationEnabled = await SystemConfiguration.IsSelfRegistrationEnabledAsync();
+        EmailConfirmationRequired = await SystemConfiguration.IsEmailConfirmationRequiredAsync();
+    }
+
+    private static string GetLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl)
+            || returnUrl[0] != '/'
+            || (returnUrl.Length > 1 && (returnUrl[1] == '/' || returnUrl[1] == '\\')))
+        {
+            return "/";
+        }
+
+        return returnUrl;
+    }
+}
