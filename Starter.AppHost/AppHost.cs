@@ -28,7 +28,8 @@ postgres.WithPgAdmin(pgAdmin =>
         .WithEnvironment("PGADMIN_DEFAULT_PASSWORD", PgAdminDefaultPassword)
         .WithEnvironment("PGADMIN_CONFIG_SERVER_MODE", "False")
         .WithEnvironment("PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED", "False")
-        .WithHostPort(5050)
+        // Bind directly because pgAdmin's gunicorn responses can trip the Aspire proxy health check.
+        .WithHttpEndpoint(targetPort: 80, port: 5050, name: "http", isProxied: false)
         .WaitFor(postgres);
 
     foreach (var healthCheck in pgAdmin.Resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())
