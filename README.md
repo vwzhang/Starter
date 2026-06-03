@@ -76,7 +76,7 @@ Common local URLs:
 | smtp4dev | `http://localhost:5080` |
 | Aspire Dashboard | Shown by `aspire start` |
 
-pgAdmin is configured for local development with server mode and master password prompts disabled. If a login prompt appears, use `admin@starter.local` / `Happy1..`.
+pgAdmin is configured for local development with server mode and master password prompts disabled. If a login prompt appears, use `admin@domain.com` / `Happy1..`.
 
 If a port changes, check the Aspire dashboard or run:
 

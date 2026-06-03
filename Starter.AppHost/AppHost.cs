@@ -12,7 +12,7 @@ var smtp4dev = builder.AddContainer("smtp4dev", "rnwood/smtp4dev")
 var smtpEndpoint = smtp4dev.GetEndpoint("smtp");
 
 const string PgAdminImageTag = "9.14.0";
-const string PgAdminDefaultEmail = "admin@starter.local";
+const string PgAdminDefaultEmail = "admin@domain.com";
 const string PgAdminDefaultPassword = "Happy1..";
 
 // PostgreSQL 18 server with a persistent data volume and pgAdmin dashboard.
