@@ -28,7 +28,7 @@ This repository is meant to be cloned or used as a GitHub template when you want
 | Admin | Users, roles, permissions, features, and system configuration |
 | Email | SMTP settings, protected SMTP secret storage, smtp4dev local inbox |
 | Developer samples | Copyable CRUD vertical slice with shared DTOs and database-backed API endpoints |
-| Quality | GitHub Actions CI and Aspire integration smoke test |
+| Quality | GitHub Actions CI and local/manual Aspire integration smoke test |
 
 ## Architecture
 
@@ -181,6 +181,8 @@ Run tests:
 ```powershell
 dotnet test Starter.slnx
 ```
+
+The test project starts the Aspire AppHost and pulls Docker images for PostgreSQL, Redis, pgAdmin, and smtp4dev. GitHub Actions runs restore/build on every push and pull request; the Docker-backed Aspire smoke test is available from manual workflow dispatch to avoid public-runner Docker Hub 429 rate limits.
 
 Start Aspire:
 
