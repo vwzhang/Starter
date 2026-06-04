@@ -5,30 +5,115 @@
 ![Aspire](https://img.shields.io/badge/Aspire-13.4-5C2D91)
 ![Blazor](https://img.shields.io/badge/UI-Blazor%20%2B%20MudBlazor-594AE2)
 ![PostgreSQL](https://img.shields.io/badge/Data-PostgreSQL%2018-336791)
+![Identity](https://img.shields.io/badge/Auth-ASP.NET%20Core%20Identity-0E7C7B)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-An opinionated .NET 10 Aspire starter for building internal tools, admin portals, and full-stack line-of-business apps without spending the first day wiring infrastructure.
+A polished .NET 10 Aspire starter for internal tools, admin portals, and full-stack business apps. It gives you the infrastructure most projects need on day one: authentication, role-based admin pages, runtime settings, PostgreSQL, Redis, local email capture, migrations, a Minimal API, a Blazor frontend, shared DTOs, and a real database-backed CRUD slice.
 
 ![Starter Workspace](docs/assets/starter-workspace.png)
 
-## Why This Starter
+## Why Use This
 
-This repository is meant to be cloned or used as a GitHub template when you want a real app foundation instead of a blank demo. It includes the pieces most teams add immediately: identity, roles, admin pages, PostgreSQL, Redis, migrations, local email capture, typed DTOs, a Minimal API, a Blazor frontend, and an integration test that starts the distributed app.
+Starting from a blank Aspire template is clean, but the first useful app usually needs the same foundation again and again. Enhanced Aspire Starter packages that foundation into a working application you can run, inspect, rename, and extend.
 
-## Included
-
-| Area | Included |
+| What you need | Already included |
 | --- | --- |
-| App orchestration | .NET Aspire AppHost with Redis, PostgreSQL 18, pgAdmin, smtp4dev, API, Web, and migration service |
-| Frontend | Blazor Web App, Interactive Server render mode, MudBlazor shell, module navigation, dark mode |
-| Backend | Minimal API with service discovery and OpenAPI in Development |
-| Data | PostgreSQL shared by API and Web, EF Core migrations, development seed data |
-| Identity | ASP.NET Core Identity, seeded admin/manager/user accounts, roles, permissions, feature flags |
-| Account flows | Self registration, configurable email confirmation, forgot/reset password |
-| Admin | Users, roles, permissions, features, and system configuration |
-| Email | SMTP settings, protected SMTP secret storage, smtp4dev local inbox |
-| Developer samples | Copyable catalog master-detail slice with shared DTOs and database-backed API endpoints |
-| Quality | GitHub Actions CI and local/manual Aspire integration smoke test |
+| Local orchestration | Aspire AppHost with PostgreSQL 18, Redis, pgAdmin, smtp4dev, API, Web, and migration service |
+| Authentication | ASP.NET Core Identity, seeded test accounts, self registration, email confirmation, forgot/reset password |
+| Authorization | Admin roles, permissions, feature flags, policy-protected admin pages |
+| Admin UI | Dashboard, users, roles, permissions, features, and system configuration |
+| Configuration | Runtime settings stored in the database, including SMTP and account-flow options |
+| Data path | EF Core migrations, API-owned catalog schema, shared DTOs, Blazor CRUD UI |
+| Developer loop | Local email inbox, pgAdmin, Redis output cache, Aspire dashboard, smoke test |
+
+## Five-Minute Start
+
+Prerequisites:
+
+- .NET 10 SDK
+- Aspire CLI
+- Docker Desktop or another Docker-compatible runtime
+
+Clone and run the full stack:
+
+```powershell
+git clone https://github.com/vwzhang/Starter.git
+cd Starter
+aspire start --apphost Starter.AppHost/Starter.AppHost.csproj
+```
+
+Then open the URL shown by Aspire. The default local web endpoint is usually:
+
+```text
+https://localhost:7131
+```
+
+Useful local URLs:
+
+| Area | URL |
+| --- | --- |
+| Workspace dashboard | `https://localhost:7131/` |
+| Admin login | `https://localhost:7131/admin/login` |
+| Catalog CRUD sample | `https://localhost:7131/dev/catalog` |
+| pgAdmin | `http://localhost:5050` |
+| smtp4dev inbox | `http://localhost:5080` |
+| Aspire dashboard | Printed by `aspire start` |
+
+If a port changes, ask Aspire:
+
+```powershell
+aspire describe --apphost Starter.AppHost/Starter.AppHost.csproj
+```
+
+## Create From The Template
+
+The installable template is maintained in the companion repository:
+
+```text
+https://github.com/vwzhang/Starter.Template
+```
+
+After installing the template package, create a new app with:
+
+```powershell
+dotnet new enhanced-aspire-starter -n AcmeOps -o C:\Code\AcmeOps
+cd C:\Code\AcmeOps
+dotnet build AcmeOps.slnx
+aspire start --apphost AcmeOps.AppHost/AcmeOps.AppHost.csproj
+```
+
+The template has practical switches so each project can start with the right local shape:
+
+```powershell
+dotnet new enhanced-aspire-starter `
+  -n AcmeOps `
+  -o C:\Code\AcmeOps `
+  --database-name acmeopsdb `
+  --include-pgadmin true `
+  --include-smtp4dev true `
+  --seed-users true `
+  --seed-sample-data true
+```
+
+| Option | Default | Use when |
+| --- | --- | --- |
+| `--database-name` | `<project-name>db` | You want a specific database and connection-string name |
+| `--include-pgadmin` | `true` | You want a browser UI for inspecting PostgreSQL locally |
+| `--include-smtp4dev` | `true` | You want account emails captured without an external SMTP server |
+| `--seed-users` | `true` | You want ready-to-use admin, manager, and user accounts |
+| `--seed-sample-data` | `true` | You want the Catalog CRUD page to open with sample data |
+
+## Default Accounts
+
+The migration service seeds local users in Development when `--seed-users` is enabled:
+
+| Email | Role | Password |
+| --- | --- | --- |
+| `admin@starter.local` | Administrator | `Happy1..` |
+| `manager@starter.local` | Manager | `Happy1..` |
+| `user@starter.local` | User | `Happy1..` |
+
+Open `/admin/login` or use the login button in the app bar.
 
 ## Architecture
 
@@ -51,54 +136,23 @@ flowchart LR
     Web --> Smtp
 ```
 
-## Quick Start
+The application is intentionally split the way a real Aspire app usually grows:
 
-Prerequisites:
-
-- .NET 10 SDK
-- Docker Desktop or another Docker-compatible runtime
-- Aspire CLI
-
-Start the full local stack:
-
-```powershell
-aspire start --apphost Starter.AppHost/Starter.AppHost.csproj
-```
-
-Common local URLs:
-
-| Service | URL |
+| Project | Responsibility |
 | --- | --- |
-| Web | `https://localhost:7131` |
-| Starter workspace | `https://localhost:7131/` |
-| Catalog CRUD sample | `https://localhost:7131/dev/catalog` |
-| pgAdmin | `http://localhost:5050` |
-| smtp4dev | `http://localhost:5080` |
-| Aspire Dashboard | Shown by `aspire start` |
+| `Starter.AppHost` | Aspire orchestration and local resources |
+| `Starter.ApiService` | Minimal API backend and API-owned catalog data |
+| `Starter.Web` | Blazor Web App, Identity, admin module, settings, dev pages |
+| `Starter.Shared` | DTOs shared by API and Web |
+| `Starter.MigrationService` | EF Core migrations and seed data |
+| `Starter.ServiceDefaults` | Health checks, telemetry, service discovery, resilience |
+| `Starter.Tests` | Aspire integration smoke test |
 
-pgAdmin is configured for local development with server mode and master password prompts disabled. If a login prompt appears, use `admin@domain.com` / `Happy1..`.
+## Admin And Settings
 
-If a port changes, check the Aspire dashboard or run:
+The Admin module is meant to be useful immediately and easy to replace later.
 
-```powershell
-aspire describe --apphost Starter.AppHost/Starter.AppHost.csproj
-```
-
-## Seeded Accounts
-
-The migration service seeds local test users in Development:
-
-| Email | Role | Password |
-| --- | --- | --- |
-| `admin@starter.local` | Administrator | `Happy1..` |
-| `manager@starter.local` | Manager | `Happy1..` |
-| `user@starter.local` | User | `Happy1..` |
-
-Open `/admin/login` or use the app bar login button.
-
-## Admin And Configuration
-
-The Admin module includes:
+Included tabs:
 
 - Dashboard
 - Users
@@ -107,9 +161,7 @@ The Admin module includes:
 - Features
 - System settings
 
-System settings are stored in the `Settings` table and seeded from `Starter.Web/Services/SystemConfigurationService.cs`.
-
-Useful runtime settings include:
+System settings are stored in the database and seeded by `Starter.Web/Services/SystemConfigurationService.cs`. They include:
 
 - Self registration
 - Require email confirmation
@@ -117,35 +169,36 @@ Useful runtime settings include:
 - Public base URL
 - SMTP delivery, host, port, SSL, username, password/API key
 
-Secret settings, such as SMTP password or API key, are protected with ASP.NET Core Data Protection before being stored.
+Secret values are protected with ASP.NET Core Data Protection before they are stored.
 
 ## Local Email
 
-The AppHost runs smtp4dev so account emails can be tested without an external SMTP server.
+The default AppHost runs smtp4dev, so account email flows work without an external SMTP server.
 
 Development defaults:
 
 - Email delivery enabled
-- SMTP host/port seeded from the Aspire smtp4dev endpoint
+- SMTP host and port supplied by the Aspire smtp4dev resource
 - SMTP SSL disabled
 - SMTP username/password blank
 - From address `no-reply@starter.local`
 
-Use `http://localhost:5080` to view captured messages. Forgot password and email confirmation flows are both wired to the configured account email sender.
+Use `http://localhost:5080` to inspect captured messages. Forgot password and email confirmation are both wired through the same account email sender.
 
-## Catalog CRUD Module
+## Catalog CRUD Slice
 
-The Catalog CRUD module is a copyable master-detail vertical slice:
+The Catalog module demonstrates the recommended shape for a real feature: API owns the data model, Web owns the UI, and Shared owns the DTO contract.
 
-- DTOs: `Starter.Shared/CatalogDtos.cs`
-- Entities: `Starter.ApiService/Data/CatalogCategory.cs`, `Starter.ApiService/Data/CatalogProduct.cs`
-- EF configuration: `Starter.ApiService/Data/CatalogDbContext.cs`
-- Migration: `Starter.ApiService/Data/Migrations/*_CatalogCrud.cs`
-- Sample data: `Starter.ApiService/Data/CatalogSeedExtensions.cs`
-- API endpoints: `Starter.ApiService/CatalogEndpoints.cs`
-- Web client: `Starter.Web/CatalogApiClient.cs`
-- Blazor page: `Starter.Web/Components/Pages/Dev/Crud.razor`
-- Navigation: `Starter.Web/Components/Pages/Dev/DevNav.razor`
+| Layer | Files |
+| --- | --- |
+| DTOs | `Starter.Shared/CatalogDtos.cs` |
+| Entities | `Starter.ApiService/Data/CatalogCategory.cs`, `Starter.ApiService/Data/CatalogProduct.cs` |
+| EF Core | `Starter.ApiService/Data/CatalogDbContext.cs`, `Starter.ApiService/Data/Migrations/*_CatalogCrud.cs` |
+| Seed data | `Starter.ApiService/Data/CatalogSeedExtensions.cs` |
+| API | `Starter.ApiService/CatalogEndpoints.cs` |
+| Web client | `Starter.Web/CatalogApiClient.cs` |
+| Blazor page | `Starter.Web/Components/Pages/Dev/Crud.razor` |
+| Navigation | `Starter.Web/Components/Pages/Dev/DevNav.razor` |
 
 API endpoints:
 
@@ -161,23 +214,11 @@ PUT    /dev/catalog/products/{id}
 DELETE /dev/catalog/products/{id}
 ```
 
-To create a real feature module, keep the UI in Web, own the data model and EF migration in ApiService, and share request/response DTOs through Starter.Shared. The migration service seeds catalog sample data in Development; set `Catalog:Seed:SampleData=false` to disable it.
+Use this slice as the copy-and-rename pattern for the first real module in your app.
 
-## Project Layout
+## Common Commands
 
-```text
-Starter.AppHost            Aspire orchestration
-Starter.ApiService         Minimal API backend
-Starter.Web                Blazor Web App, Identity, admin, dev pages
-Starter.Shared             DTOs shared by API and Web
-Starter.MigrationService   EF migrations and seed data
-Starter.ServiceDefaults    Aspire service defaults
-Starter.Tests              Aspire integration tests
-```
-
-## Useful Commands
-
-Build everything:
+Build:
 
 ```powershell
 dotnet build Starter.slnx
@@ -188,8 +229,6 @@ Run tests:
 ```powershell
 dotnet test Starter.slnx
 ```
-
-The test project starts the Aspire AppHost and pulls Docker images for PostgreSQL, Redis, pgAdmin, and smtp4dev. GitHub Actions runs restore/build on every push and pull request; the Docker-backed Aspire smoke test is available from manual workflow dispatch to avoid public-runner Docker Hub 429 rate limits.
 
 Start Aspire:
 
@@ -209,13 +248,19 @@ Rebuild one running resource:
 aspire resource webfrontend rebuild --apphost Starter.AppHost/Starter.AppHost.csproj --non-interactive
 ```
 
-Add a migration:
+Add an Identity/Admin migration:
 
 ```powershell
 dotnet ef migrations add MigrationName --project Starter.Web/Starter.Web.csproj --startup-project Starter.Web/Starter.Web.csproj --context ApplicationDbContext --output-dir Data/Migrations
 ```
 
-## Development Vs Production Defaults
+Add a Catalog/API migration:
+
+```powershell
+dotnet ef migrations add MigrationName --project Starter.ApiService/Starter.ApiService.csproj --startup-project Starter.ApiService/Starter.ApiService.csproj --context CatalogDbContext --output-dir Data/Migrations
+```
+
+## Development And Production Defaults
 
 Development is intentionally convenient:
 
@@ -230,6 +275,12 @@ Production defaults are more conservative:
 - Self registration disabled
 - Email delivery disabled until configured
 - Development confirmation/reset links disabled
+
+Before production, set real SMTP settings, change seed credentials, choose your registration policy, configure persistent hosting storage, and review role/permission names for your domain.
+
+## Current Template Roadmap
+
+The next useful template options are database provider choices, such as PostgreSQL, SQL Server Express, LocalDB, and SQLite. The current version is PostgreSQL-first because it gives the cleanest Aspire local-development story.
 
 ## Search Keywords
 
