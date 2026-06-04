@@ -46,7 +46,7 @@ public class WebTests
         var loginResponse = await httpClient.GetAsync("/admin/login", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
-        // Act + Assert: shared DTO CRUD API works against the migrated starter database.
+        // Act + Assert: shared DTO CRUD API works against the migrated application database.
         var createRequest = new DevTodoSaveRequest(
             "CI smoke todo",
             "Created by Starter.Tests",
