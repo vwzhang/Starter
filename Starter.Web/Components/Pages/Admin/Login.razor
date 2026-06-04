@@ -1,6 +1,7 @@
 @page "/admin/login"
 @layout BlankLayout
 @attribute [AllowAnonymous]
+@inject Microsoft.Extensions.Options.IOptions<IdentitySeedOptions> IdentitySeedOptions
 
 <PageTitle>Admin Login</PageTitle>
 
@@ -8,7 +9,7 @@
     <MudPaper Class="pa-6 admin-login-panel" Outlined="true">
         <MudStack Spacing="3">
             <MudText Typo="Typo.h4">Admin Login</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Use the seeded development accounts to test admin access.</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@LoginHelpText</MudText>
 
             @if (Failed == "1")
             {
@@ -72,21 +73,24 @@
         </MudStack>
     </MudPaper>
 
-    <MudPaper Class="pa-4 admin-login-panel" Outlined="true">
-        <MudText Typo="Typo.subtitle2" GutterBottom="true">Development accounts</MudText>
-        <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
-            <HeaderContent>
-                <MudTh>Email</MudTh>
-                <MudTh>Role</MudTh>
-                <MudTh>Password</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Email">@context.Email</MudTd>
-                <MudTd DataLabel="Role">@context.Role</MudTd>
-                <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
+    @if (ShowDevelopmentAccounts)
+    {
+        <MudPaper Class="pa-4 admin-login-panel" Outlined="true">
+            <MudText Typo="Typo.subtitle2" GutterBottom="true">Development accounts</MudText>
+            <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Role</MudTh>
+                    <MudTh>Password</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Role">@context.Role</MudTd>
+                    <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
 </MudStack>
 
 @code {
@@ -117,6 +121,10 @@
     private string LocalReturnUrl => GetLocalReturnUrl(ReturnUrl);
     private string SignInAction => $"/admin/sign-in?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
     private string RegisterHref => $"/account/register?returnUrl={Uri.EscapeDataString(LocalReturnUrl)}";
+    private bool ShowDevelopmentAccounts => IdentitySeedOptions.Value.SeedDevelopmentTestUsers;
+    private string LoginHelpText => ShowDevelopmentAccounts
+        ? "Use the seeded development accounts to test admin access."
+        : "Sign in with an existing administrator account or register a local user.";
 
     private static readonly SeedAccount[] SeedAccounts =
     [

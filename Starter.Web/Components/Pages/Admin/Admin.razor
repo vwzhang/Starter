@@ -4,6 +4,7 @@
 @inject SystemConfigurationService SystemConfiguration
 @inject IAuthorizationService AuthorizationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Microsoft.Extensions.Options.IOptions<IdentitySeedOptions> IdentitySeedOptions
 @inject ISnackbar Snackbar
 
 <PageTitle>Admin</PageTitle>
@@ -51,21 +52,24 @@
                 </MudItem>
             </MudGrid>
 
-            <MudPaper Class="pa-4 mt-4" Outlined="true">
-                <MudText Typo="Typo.subtitle1" GutterBottom="true">Seeded test accounts</MudText>
-                <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
-                    <HeaderContent>
-                        <MudTh>Email</MudTh>
-                        <MudTh>Role</MudTh>
-                        <MudTh>Password</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Email">@context.Email</MudTd>
-                        <MudTd DataLabel="Role">@context.Role</MudTd>
-                        <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudPaper>
+            @if (ShowDevelopmentAccounts)
+            {
+                <MudPaper Class="pa-4 mt-4" Outlined="true">
+                    <MudText Typo="Typo.subtitle1" GutterBottom="true">Seeded test accounts</MudText>
+                    <MudTable Items="SeedAccounts" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Email</MudTh>
+                            <MudTh>Role</MudTh>
+                            <MudTh>Password</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Email">@context.Email</MudTd>
+                            <MudTd DataLabel="Role">@context.Role</MudTd>
+                            <MudTd DataLabel="Password"><code>Happy1..</code></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
         </MudTabPanel>
 
         @if (CanManageUsers)
@@ -358,6 +362,7 @@
     private bool CanManagePermissions { get; set; }
     private bool CanManageFeatures { get; set; }
     private bool CanManageSystem { get; set; }
+    private bool ShowDevelopmentAccounts => IdentitySeedOptions.Value.SeedDevelopmentTestUsers;
 
     private static readonly SeedAccount[] SeedAccounts =
     [

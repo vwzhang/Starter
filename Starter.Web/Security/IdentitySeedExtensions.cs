@@ -81,7 +81,7 @@ public static class IdentitySeedExtensions
                 "No configured seed administrator was found. Use the Admin setup page or configure Identity:Seed:AdminEmail and Identity:Seed:AdminPassword.");
         }
 
-        if (environment.IsDevelopment())
+        if (environment.IsDevelopment() && options.SeedDevelopmentTestUsers)
         {
             await SeedDevelopmentTestUsersAsync(dbContext, roleManager, userManager, logger);
         }

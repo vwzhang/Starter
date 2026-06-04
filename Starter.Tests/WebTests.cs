@@ -33,11 +33,15 @@ public class WebTests
 
         var httpClient = app.CreateHttpClient("webfrontend");
         var apiClient = app.CreateHttpClient("apiservice");
+//#if (includeSmtp4dev)
         var smtpClient = app.CreateHttpClient("smtp4dev");
+//#endif
 
         await app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
         await app.ResourceNotifications.WaitForResourceHealthyAsync("apiservice", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+//#if (includeSmtp4dev)
         await app.ResourceNotifications.WaitForResourceHealthyAsync("smtp4dev", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+//#endif
 
         // Act + Assert: Web shell and admin login are reachable.
         var response = await httpClient.GetAsync("/", cancellationToken);
@@ -95,6 +99,7 @@ public class WebTests
         var deleteCategoryResponse = await apiClient.DeleteAsync($"/dev/catalog/categories/{createdCategory.Id}", cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, deleteCategoryResponse.StatusCode);
 
+//#if (includeSmtp4dev)
         // Act + Assert: forgot-password uses the seeded SMTP settings and is captured by smtp4dev.
         var forgotResponse = await httpClient.PostAsync(
             "/account/forgot-password",
@@ -106,8 +111,10 @@ public class WebTests
         Assert.True(forgotResponse.IsSuccessStatusCode || forgotResponse.StatusCode == HttpStatusCode.Redirect);
 
         await WaitForSmtpMessageAsync(smtpClient, "Reset your Starter password", cancellationToken);
+//#endif
     }
 
+//#if (includeSmtp4dev)
     private static async Task WaitForSmtpMessageAsync(
         HttpClient smtpClient,
         string expectedText,
@@ -133,4 +140,5 @@ public class WebTests
             lastResponse.Contains(expectedText, StringComparison.OrdinalIgnoreCase),
             $"smtp4dev did not receive a message containing '{expectedText}'. Last response: {lastResponse}");
     }
+//#endif
 }
