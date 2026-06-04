@@ -204,12 +204,6 @@ h1:focus {
     background: var(--mud-palette-background);
 }
 
-.starter-service:hover,
-.starter-service:focus-visible {
-    border-color: var(--mud-palette-primary);
-    text-decoration: none;
-}
-
 .starter-service-icon {
     display: inline-flex;
     align-items: center;

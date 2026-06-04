@@ -9,7 +9,7 @@ var cache = builder.AddRedis("cache");
 
 //#if (includeSmtp4dev)
 var smtp4dev = builder.AddContainer("smtp4dev", "rnwood/smtp4dev")
-    .WithHttpEndpoint(targetPort: 80, port: 5080)
+    .WithHttpEndpoint(targetPort: 80)
     .WithEndpoint(targetPort: 25, scheme: "tcp", name: "smtp")
     .WithHttpHealthCheck("/");
 
@@ -37,7 +37,7 @@ postgres.WithPgAdmin(pgAdmin =>
         .WithEnvironment("PGADMIN_CONFIG_SERVER_MODE", "False")
         .WithEnvironment("PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED", "False")
         // Bind directly because pgAdmin's gunicorn responses can trip the Aspire proxy health check.
-        .WithHttpEndpoint(targetPort: 80, port: 5050, name: "http", isProxied: false)
+        .WithHttpEndpoint(targetPort: 80, name: "http", isProxied: false)
         .WaitFor(postgres);
 
     foreach (var healthCheck in pgAdmin.Resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())

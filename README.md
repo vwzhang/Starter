@@ -42,21 +42,17 @@ cd Starter
 aspire start --apphost Starter.AppHost/Starter.AppHost.csproj
 ```
 
-Then open the URL shown by Aspire. The default local web endpoint is usually:
-
-```text
-https://localhost:7131
-```
+Then open the `webfrontend` endpoint shown by Aspire. Dashboard, web, API, pgAdmin, and smtp4dev ports are assigned dynamically so multiple generated projects can run side by side.
 
 Useful local URLs:
 
 | Area | URL |
 | --- | --- |
-| Workspace dashboard | `https://localhost:7131/` |
-| Admin login | `https://localhost:7131/admin/login` |
-| Catalog CRUD sample | `https://localhost:7131/dev/catalog` |
-| pgAdmin | `http://localhost:5050` |
-| smtp4dev inbox | `http://localhost:5080` |
+| Workspace dashboard | `webfrontend` endpoint + `/` |
+| Admin login | `webfrontend` endpoint + `/admin/login` |
+| Catalog CRUD sample | `webfrontend` endpoint + `/dev/catalog` |
+| pgAdmin | `pgadmin` endpoint in Aspire Dashboard |
+| smtp4dev inbox | `smtp4dev` endpoint in Aspire Dashboard |
 | Aspire dashboard | Printed by `aspire start` |
 
 If a port changes, ask Aspire:
@@ -185,7 +181,7 @@ Development defaults:
 - SMTP username/password blank
 - From address `no-reply@starter.local`
 
-Use `http://localhost:5080` to inspect captured messages. Forgot password and email confirmation are both wired through the same account email sender.
+Open the `smtp4dev` endpoint from the Aspire Dashboard to inspect captured messages. Forgot password and email confirmation are both wired through the same account email sender.
 
 ## Catalog CRUD Slice
 

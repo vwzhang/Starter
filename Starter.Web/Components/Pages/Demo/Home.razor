@@ -28,7 +28,7 @@
             <div class="starter-service-list">
                 @foreach (var service in LocalServices)
                 {
-                    <a class="starter-service" href="@service.Url" target="_blank" rel="noopener">
+                    <div class="starter-service">
                         <span class="starter-service-icon">
                             <MudIcon Icon="@service.Icon" Size="Size.Small" />
                         </span>
@@ -36,7 +36,7 @@
                             <strong>@service.Name</strong>
                             <small>@service.Description</small>
                         </span>
-                    </a>
+                    </div>
                 }
             </div>
         </div>
@@ -85,8 +85,8 @@
                     <MudText Typo="Typo.body2" Class="starter-muted">
                         smtp4dev captures account emails locally, while Admin/System holds SMTP settings for future production delivery.
                     </MudText>
-                    <MudButton Href="http://localhost:5080" Target="_blank" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew">
-                        Open inbox
+                    <MudButton Href="/admin" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">
+                        Email settings
                     </MudButton>
                 </MudStack>
             </MudPaper>
@@ -132,8 +132,8 @@
 @code {
     private static readonly LocalService[] LocalServices =
     [
-        new("pgAdmin", "PostgreSQL dashboard", "http://localhost:5050", Icons.Material.Filled.Storage),
-        new("smtp4dev", "Captured outbound email", "http://localhost:5080", Icons.Material.Filled.MarkEmailRead),
+        new("pgAdmin", "Endpoint shown in Aspire Dashboard", Icons.Material.Filled.Storage),
+        new("smtp4dev", "Endpoint shown in Aspire Dashboard", Icons.Material.Filled.MarkEmailRead),
     ];
 
     private static readonly ChecklistItem[] Checklist =
@@ -153,7 +153,7 @@
 
     private const string BrandFoundation = "Enhanced Aspire St" + "arter foundation";
 
-    private sealed record LocalService(string Name, string Description, string Url, string Icon);
+    private sealed record LocalService(string Name, string Description, string Icon);
     private sealed record ChecklistItem(string Title, string Description);
     private sealed record SeedAccount(string Email, string Role);
 }
