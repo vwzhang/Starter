@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using Starter.ApiService.Data;
 using Starter.Web.Data;
 using Starter.Web.Security;
 using Starter.Web.Services;
@@ -10,6 +11,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 
 builder.AddNpgsqlDbContext<ApplicationDbContext>("starterdb");
+builder.AddNpgsqlDbContext<DevTodoDbContext>("starterdb");
 
 builder.Services.AddDataProtection();
 builder.Services
@@ -39,12 +41,16 @@ internal sealed class Worker(
         try
         {
             using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var applicationDbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var devTodoDbContext = scope.ServiceProvider.GetRequiredService<DevTodoDbContext>();
 
-            await BaselineExistingEnsureCreatedDatabaseAsync(dbContext, logger, stoppingToken);
+            await BaselineExistingEnsureCreatedDatabaseAsync(applicationDbContext, logger, stoppingToken);
 
-            logger.LogInformation("Applying database migrations.");
-            await dbContext.Database.MigrateAsync(stoppingToken);
+            logger.LogInformation("Applying application database migrations.");
+            await applicationDbContext.Database.MigrateAsync(stoppingToken);
+
+            logger.LogInformation("Applying API CRUD database migrations.");
+            await devTodoDbContext.Database.MigrateAsync(stoppingToken);
 
             logger.LogInformation("Seeding identity and admin data.");
             await scope.ServiceProvider.InitializeIdentityDataAsync(stoppingToken);
@@ -70,7 +76,7 @@ internal sealed class Worker(
     }
 
     private static async Task BaselineExistingEnsureCreatedDatabaseAsync(
-        ApplicationDbContext dbContext,
+        DbContext dbContext,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -111,7 +117,7 @@ internal sealed class Worker(
     }
 
     private static async Task<bool> TableExistsAsync(
-        ApplicationDbContext dbContext,
+        DbContext dbContext,
         string tableName,
         CancellationToken cancellationToken)
     {

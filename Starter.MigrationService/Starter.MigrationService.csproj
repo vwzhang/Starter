@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Starter.ApiService\Starter.ApiService.csproj" />
     <ProjectReference Include="..\Starter.ServiceDefaults\Starter.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Starter.Web\Starter.Web.csproj" />
   </ItemGroup>

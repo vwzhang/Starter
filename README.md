@@ -138,9 +138,9 @@ Use `http://localhost:5080` to view captured messages. Forgot password and email
 The Dev CRUD module is a copyable vertical slice:
 
 - DTOs: `Starter.Shared/DevTodoDtos.cs`
-- Entity: `Starter.Web/Data/DevTodoItem.cs`
-- EF configuration: `Starter.Web/Data/ApplicationDbContext.cs`
-- Migration: `Starter.Web/Data/Migrations/*_DevTodoCrud.cs`
+- Entity: `Starter.ApiService/Data/DevTodoItem.cs`
+- EF configuration: `Starter.ApiService/Data/DevTodoDbContext.cs`
+- Migration: `Starter.ApiService/Data/Migrations/*_DevTodoCrud.cs`
 - API endpoints: `Starter.ApiService/DevTodoEndpoints.cs`
 - Web client: `Starter.Web/DevTodoApiClient.cs`
 - Blazor page: `Starter.Web/Components/Pages/Dev/Crud.razor`
@@ -156,7 +156,7 @@ PUT    /dev/todos/{id}
 DELETE /dev/todos/{id}
 ```
 
-To create a real feature module, copy the slice and rename the DTOs, entity, API route group, typed client, page, nav entry, and migration.
+To create a real feature module, keep the UI in Web, own the data model and EF migration in ApiService, and share request/response DTOs through Starter.Shared.
 
 ## Project Layout
 

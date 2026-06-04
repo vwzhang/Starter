@@ -15,9 +15,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddRedisOutputCache("cache");
 
-// Register the shared "starter" PostgreSQL database (NpgsqlDataSource via DI).
-builder.AddNpgsqlDataSource("starterdb");
-
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

@@ -10,7 +10,6 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<ApplicationPermission> Permissions => Set<ApplicationPermission>();
     public DbSet<ApplicationRolePermission> RolePermissions => Set<ApplicationRolePermission>();
     public DbSet<ApplicationSetting> Settings => Set<ApplicationSetting>();
-    public DbSet<DevTodoItem> DevTodoItems => Set<DevTodoItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -76,14 +75,5 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             entity.Property(setting => setting.Description).HasMaxLength(512);
         });
 
-        builder.Entity<DevTodoItem>(entity =>
-        {
-            entity.ToTable("DevTodoItems");
-            entity.HasIndex(item => item.Status);
-            entity.HasIndex(item => item.DueDate);
-            entity.Property(item => item.Title).HasMaxLength(140);
-            entity.Property(item => item.Notes).HasMaxLength(1000);
-            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(40);
-        });
     }
 }

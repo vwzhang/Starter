@@ -1,6 +1,6 @@
 using Starter.Shared;
 
-namespace Starter.Web.Data;
+namespace Starter.ApiService.Data;
 
 public sealed class DevTodoItem
 {

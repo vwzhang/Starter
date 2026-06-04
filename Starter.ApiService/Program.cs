@@ -1,13 +1,14 @@
 using Starter.Shared;
 using Starter.ApiService;
+using Starter.ApiService.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-// Register the shared "starter" PostgreSQL database (NpgsqlDataSource via DI).
-builder.AddNpgsqlDataSource("starterdb");
+// Register the API-owned CRUD database context.
+builder.AddNpgsqlDbContext<DevTodoDbContext>("starterdb");
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
