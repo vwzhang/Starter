@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Globalization;
 using Starter.ApiService.Data;
 using Starter.Web.Data;
 using Starter.Web.Security;
@@ -38,6 +39,8 @@ internal sealed class Worker(
     IHostEnvironment hostEnvironment,
     ILogger<Worker> logger) : BackgroundService
 {
+    private const string EfMigrationsHistoryTable = "__EFMigrationsHistory";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
@@ -92,7 +95,7 @@ internal sealed class Worker(
         var migrations = dbContext.Database.GetMigrations().ToArray();
 
         if (migrations.Length == 0
-            || await TableExistsAsync(dbContext, "__EFMigrationsHistory", cancellationToken)
+            || await TableExistsAsync(dbContext, EfMigrationsHistoryTable, cancellationToken)
             || !await TableExistsAsync(dbContext, "AspNetUsers", cancellationToken))
         {
             return;
@@ -101,7 +104,37 @@ internal sealed class Worker(
         logger.LogWarning(
             "Existing Identity tables were found without EF migration history. Marking existing schema as baseline.");
 
-        await dbContext.Database.ExecuteSqlRawAsync(
+        await CreateMigrationsHistoryTableAsync(dbContext, cancellationToken);
+
+        var efCoreVersion = typeof(DbContext).Assembly.GetName().Version?.ToString(3) ?? "10.0.0";
+
+        foreach (var migration in migrations)
+        {
+            await InsertMigrationHistoryAsync(dbContext, migration, efCoreVersion, cancellationToken);
+        }
+    }
+
+    private static Task CreateMigrationsHistoryTableAsync(
+        DbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (IsSqlServer(dbContext))
+        {
+            return dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[dbo].[__EFMigrationsHistory]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[__EFMigrationsHistory] (
+                        [MigrationId] nvarchar(150) NOT NULL,
+                        [ProductVersion] nvarchar(32) NOT NULL,
+                        CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
+                    );
+                END
+                """,
+                cancellationToken);
+        }
+
+        return dbContext.Database.ExecuteSqlRawAsync(
             """
             CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
                 "MigrationId" character varying(150) NOT NULL,
@@ -110,19 +143,38 @@ internal sealed class Worker(
             );
             """,
             cancellationToken);
+    }
 
-        var efCoreVersion = typeof(DbContext).Assembly.GetName().Version?.ToString(3) ?? "10.0.0";
-
-        foreach (var migration in migrations)
+    private static Task InsertMigrationHistoryAsync(
+        DbContext dbContext,
+        string migration,
+        string efCoreVersion,
+        CancellationToken cancellationToken)
+    {
+        if (IsSqlServer(dbContext))
         {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            return dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"""
-                INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-                VALUES ({migration}, {efCoreVersion})
-                ON CONFLICT ("MigrationId") DO NOTHING;
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM [dbo].[__EFMigrationsHistory]
+                    WHERE [MigrationId] = {migration}
+                )
+                BEGIN
+                    INSERT INTO [dbo].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+                    VALUES ({migration}, {efCoreVersion});
+                END
                 """,
                 cancellationToken);
         }
+
+        return dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            VALUES ({migration}, {efCoreVersion})
+            ON CONFLICT ("MigrationId") DO NOTHING;
+            """,
+            cancellationToken);
     }
 
     private static async Task<bool> TableExistsAsync(
@@ -141,21 +193,30 @@ internal sealed class Worker(
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.tables
-                    WHERE table_schema = 'public'
-                      AND table_name = @tableName
-                );
-                """;
+            command.CommandText = IsSqlServer(dbContext)
+                ? """
+                  SELECT CAST(CASE WHEN EXISTS (
+                      SELECT 1
+                      FROM INFORMATION_SCHEMA.TABLES
+                      WHERE TABLE_SCHEMA = 'dbo'
+                        AND TABLE_NAME = @tableName
+                  ) THEN 1 ELSE 0 END AS bit);
+                  """
+                : """
+                  SELECT EXISTS (
+                      SELECT 1
+                      FROM information_schema.tables
+                      WHERE table_schema = 'public'
+                        AND table_name = @tableName
+                  );
+                  """;
 
             var parameter = command.CreateParameter();
             parameter.ParameterName = "@tableName";
             parameter.Value = tableName;
             command.Parameters.Add(parameter);
 
-            return await command.ExecuteScalarAsync(cancellationToken) is true;
+            return IsTruthy(await command.ExecuteScalarAsync(cancellationToken));
         }
         finally
         {
@@ -165,4 +226,23 @@ internal sealed class Worker(
             }
         }
     }
+
+    private static bool IsSqlServer(DbContext dbContext) =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.SqlServer",
+            StringComparison.Ordinal);
+
+    private static bool IsTruthy(object? value) =>
+        value switch
+        {
+            null => false,
+            bool boolean => boolean,
+            byte number => number != 0,
+            short number => number != 0,
+            int number => number != 0,
+            long number => number != 0,
+            decimal number => number != 0,
+            _ => Convert.ToBoolean(value, CultureInfo.InvariantCulture)
+        };
 }
