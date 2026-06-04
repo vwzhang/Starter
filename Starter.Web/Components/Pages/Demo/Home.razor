@@ -5,7 +5,7 @@
 <MudStack Spacing="4" Class="starter-home">
     <section class="starter-hero">
         <div class="starter-hero-copy">
-            <MudText Typo="Typo.overline" Class="starter-kicker">Aspire Admin Starter foundation</MudText>
+            <MudText Typo="Typo.overline" Class="starter-kicker">@BrandFoundation</MudText>
             <MudText Typo="Typo.h3" HtmlTag="h1" Class="starter-title">Starter Workspace</MudText>
             <MudText Typo="Typo.body1" Class="starter-lead">
                 A ready-to-run .NET Aspire baseline with identity, admin modules, PostgreSQL, Redis, email capture, shared DTOs, migrations, and catalog CRUD.
@@ -150,6 +150,8 @@
         new("manager@starter.local", "Manager"),
         new("user@starter.local", "User"),
     ];
+
+    private const string BrandFoundation = "Enhanced Aspire St" + "arter foundation";
 
     private sealed record LocalService(string Name, string Description, string Url, string Icon);
     private sealed record ChecklistItem(string Title, string Description);

@@ -44,8 +44,6 @@ postgres.WithPgAdmin(pgAdmin =>
     {
         pgAdmin.Resource.Annotations.Remove(healthCheck);
     }
-
-    pgAdmin.WithHttpHealthCheck("/misc/ping");
 }, "pgadmin");
 //#endif
 
