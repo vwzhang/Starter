@@ -71,7 +71,7 @@ builder.Services.AddHttpClient<WeatherApiClient>(client =>
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://apiservice");
     });
-builder.Services.AddHttpClient<DevTodoApiClient>(client =>
+builder.Services.AddHttpClient<CatalogApiClient>(client =>
     {
         client.BaseAddress = new("https+http://apiservice");
     });

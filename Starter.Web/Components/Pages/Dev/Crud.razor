@@ -1,14 +1,15 @@
+@page "/dev/catalog"
 @page "/dev/crud"
-@inject DevTodoApiClient TodoApi
+@inject CatalogApiClient CatalogApi
 @inject ISnackbar Snackbar
 
-<PageTitle>CRUD</PageTitle>
+<PageTitle>Catalog CRUD</PageTitle>
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
         <div>
-            <MudText Typo="Typo.h4">CRUD</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Dev todo module</MudText>
+            <MudText Typo="Typo.h4">Catalog CRUD</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Master-detail sample with categories and products</MudText>
         </div>
         <MudSpacer />
         <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync" Disabled="IsLoading">
@@ -23,103 +24,212 @@
 
     <MudGrid Spacing="3">
         <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudStack Spacing="2">
-                    <MudText Typo="Typo.subtitle1">@(Form.Id is null ? "New todo" : "Edit todo")</MudText>
-                    <MudTextField Label="Title" @bind-Value="Form.Title" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="140" />
-                    <MudTextField Label="Notes" @bind-Value="Form.Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" MaxLength="1000" />
-                    <MudSelect T="DevTodoStatus" Label="Status" @bind-Value="Form.Status" Variant="Variant.Outlined" Margin="Margin.Dense">
-                        @foreach (var status in Statuses)
-                        {
-                            <MudSelectItem T="DevTodoStatus" Value="@status">@GetStatusLabel(status)</MudSelectItem>
-                        }
-                    </MudSelect>
-                    <MudDatePicker Label="Due date" @bind-Date="Form.DueDate" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="yyyy-MM-dd" Clearable="true" />
-                    <MudNumericField T="int" Label="Sort order" @bind-Value="Form.SortOrder" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+            <MudStack Spacing="3">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.subtitle1">@(CategoryForm.Id is null ? "New category" : "Edit category")</MudText>
+                        <MudTextField Label="Name" @bind-Value="CategoryForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="80" />
+                        <MudTextField Label="Description" @bind-Value="CategoryForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" MaxLength="500" />
+                        <MudNumericField T="int" Label="Display order" @bind-Value="CategoryForm.DisplayOrder" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
 
-                    <MudStack Row="true" Spacing="2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="IsSaving">
-                            Save
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Clear" OnClick="ResetForm">
-                            Clear
-                        </MudButton>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveCategoryAsync" Disabled="IsSaving">
+                                Save
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Clear" OnClick="ResetCategoryForm">
+                                Clear
+                            </MudButton>
+                        </MudStack>
                     </MudStack>
-                </MudStack>
-            </MudPaper>
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.subtitle1">Categories</MudText>
+                        <MudTable Items="Categories" Dense="true" Hover="true" Elevation="0" Loading="IsLoading">
+                            <HeaderContent>
+                                <MudTh>Name</MudTh>
+                                <MudTh>Products</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="category">
+                                <MudTd DataLabel="Name">
+                                    <div class="dev-crud-title">@category.Name</div>
+                                    <div class="dev-crud-notes">@category.Description</div>
+                                </MudTd>
+                                <MudTd DataLabel="Products">@category.ProductCount</MudTd>
+                                <MudTd>
+                                    <MudTooltip Text="Filter products">
+                                        <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" Color="Color.Primary" OnClick="@(() => ApplyCategoryFilterAsync(category.Id))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Edit category">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditCategory(category))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Delete category">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteCategoryAsync(category.Id))" />
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">No categories yet.</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
         </MudItem>
 
         <MudItem xs="12" md="8">
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudStack Spacing="3">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="dev-crud-filterbar">
-                        <MudTextField Label="Search" @bind-Value="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
-                        <MudSelect T="DevTodoStatus?" Label="Status" @bind-Value="StatusFilter" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                            @foreach (var status in Statuses)
-                            {
-                                <MudSelectItem T="DevTodoStatus?" Value="@((DevTodoStatus?)status)">@GetStatusLabel(status)</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="LoadAsync" Disabled="IsLoading">
-                            Apply
-                        </MudButton>
-                    </MudStack>
-
-                    <MudTable Items="Items" Dense="true" Hover="true" Elevation="0" Loading="IsLoading">
-                        <HeaderContent>
-                            <MudTh>Title</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh>Due</MudTh>
-                            <MudTh>Order</MudTh>
-                            <MudTh></MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="item">
-                            <MudTd DataLabel="Title">
-                                <div class="dev-crud-title">@item.Title</div>
-                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+            <MudStack Spacing="3">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.subtitle1">@(ProductForm.Id is null ? "New product" : "Edit product")</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" Class="d-flex justify-end">
+                            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">
+                                @Products.Count product rows
+                            </MudChip>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="Guid" Label="Category" @bind-Value="ProductForm.CategoryId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var category in Categories)
                                 {
-                                    <div class="dev-crud-notes">@item.Notes</div>
+                                    <MudSelectItem T="Guid" Value="@category.Id">@category.Name</MudSelectItem>
                                 }
-                            </MudTd>
-                            <MudTd DataLabel="Status">
-                                <span class="@GetStatusClass(item.Status)">@GetStatusLabel(item.Status)</span>
-                            </MudTd>
-                            <MudTd DataLabel="Due">@FormatDueDate(item.DueDate)</MudTd>
-                            <MudTd DataLabel="Order">@item.SortOrder</MudTd>
-                            <MudTd>
-                                <MudTooltip Text="Edit">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => Edit(item))" />
-                                </MudTooltip>
-                                <MudTooltip Text="Delete">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(item.Id))" />
-                                </MudTooltip>
-                            </MudTd>
-                        </RowTemplate>
-                        <NoRecordsContent>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">No todo items.</MudText>
-                        </NoRecordsContent>
-                    </MudTable>
-                </MudStack>
-            </MudPaper>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField Label="Name" @bind-Value="ProductForm.Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="120" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField Label="SKU" @bind-Value="ProductForm.Sku" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="40" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudNumericField T="decimal" Label="Price" @bind-Value="ProductForm.Price" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Format="N2" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudNumericField T="int" Label="Stock" @bind-Value="ProductForm.StockQuantity" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField Label="Description" @bind-Value="ProductForm.Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" MaxLength="1000" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudSwitch T="bool" @bind-Value="ProductForm.IsActive" Color="Color.Success">Active</MudSwitch>
+                                <MudSpacer />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveProductAsync" Disabled="IsSaving || Categories.Count == 0">
+                                    Save product
+                                </MudButton>
+                                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Clear" OnClick="ResetProductForm">
+                                    Clear
+                                </MudButton>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudStack Spacing="3">
+                        <MudGrid Spacing="2" Class="dev-crud-filterbar">
+                            <MudItem xs="12" sm="4">
+                                <MudTextField Label="Search products" @bind-Value="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudSelect T="Guid?" Label="Category filter" @bind-Value="CategoryFilter" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                    @foreach (var category in Categories)
+                                    {
+                                        <MudSelectItem T="Guid?" Value="@((Guid?)category.Id)">@category.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="2">
+                                <MudSelect T="bool?" Label="Active" @bind-Value="ActiveFilter" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                    <MudSelectItem T="bool?" Value="@((bool?)true)">Active</MudSelectItem>
+                                    <MudSelectItem T="bool?" Value="@((bool?)false)">Inactive</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="2" Class="d-flex align-center">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="LoadAsync" Disabled="IsLoading" FullWidth="true">
+                                    Apply
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@Categories.Count categories</MudChip>
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">@ActiveProductCount active products</MudChip>
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">@TotalStock units in stock</MudChip>
+                            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">@InventoryValue.ToString("C") inventory value</MudChip>
+                        </MudStack>
+
+                        <MudTable Items="Products" Dense="true" Hover="true" Elevation="0" Loading="IsLoading">
+                            <HeaderContent>
+                                <MudTh>Product</MudTh>
+                                <MudTh>Category</MudTh>
+                                <MudTh>SKU</MudTh>
+                                <MudTh>Price</MudTh>
+                                <MudTh>Stock</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="product">
+                                <MudTd DataLabel="Product">
+                                    <div class="dev-crud-title">@product.Name</div>
+                                    @if (!string.IsNullOrWhiteSpace(product.Description))
+                                    {
+                                        <div class="dev-crud-notes">@product.Description</div>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Category">@product.CategoryName</MudTd>
+                                <MudTd DataLabel="SKU">@product.Sku</MudTd>
+                                <MudTd DataLabel="Price">@product.Price.ToString("C")</MudTd>
+                                <MudTd DataLabel="Stock">@product.StockQuantity</MudTd>
+                                <MudTd DataLabel="Status">
+                                    <span class="@GetProductStatusClass(product.IsActive)">
+                                        @(product.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </MudTd>
+                                <MudTd>
+                                    <MudTooltip Text="Edit product">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditProduct(product))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Delete product">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteProductAsync(product.Id))" />
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">No products match the current filters.</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
         </MudItem>
     </MudGrid>
 </MudStack>
 
 @code {
-    private static readonly DevTodoStatus[] Statuses = Enum.GetValues<DevTodoStatus>();
-
-    private IReadOnlyList<DevTodoItemDto> Items { get; set; } = [];
-    private DevTodoFormModel Form { get; set; } = new();
+    private IReadOnlyList<CatalogCategoryDto> Categories { get; set; } = [];
+    private IReadOnlyList<CatalogProductDto> Products { get; set; } = [];
+    private CatalogCategoryFormModel CategoryForm { get; set; } = new();
+    private CatalogProductFormModel ProductForm { get; set; } = new();
+    private Guid? CategoryFilter { get; set; }
     private string? Search { get; set; }
-    private DevTodoStatus? StatusFilter { get; set; }
+    private bool? ActiveFilter { get; set; }
     private string? ErrorMessage { get; set; }
     private bool IsLoading { get; set; }
     private bool IsSaving { get; set; }
+    private int ActiveProductCount => Products.Count(product => product.IsActive);
+    private int TotalStock => Products.Sum(product => product.StockQuantity);
+    private decimal InventoryValue => Products.Sum(product => product.Price * product.StockQuantity);
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
-        ResetForm();
+        ResetCategoryForm();
+        ResetProductForm();
     }
 
     private async Task LoadAsync()
@@ -129,7 +239,13 @@
 
         try
         {
-            Items = await TodoApi.GetTodosAsync(Search, StatusFilter);
+            Categories = await CatalogApi.GetCategoriesAsync();
+            Products = await CatalogApi.GetProductsAsync(CategoryFilter, Search, ActiveFilter);
+
+            if (ProductForm.CategoryId == Guid.Empty && Categories.Count > 0)
+            {
+                ProductForm.CategoryId = CategoryFilter ?? Categories[0].Id;
+            }
         }
         catch (Exception ex)
         {
@@ -141,11 +257,11 @@
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveCategoryAsync()
     {
-        if (string.IsNullOrWhiteSpace(Form.Title))
+        if (string.IsNullOrWhiteSpace(CategoryForm.Name))
         {
-            Snackbar.Add("Title is required.", Severity.Error);
+            Snackbar.Add("Category name is required.", Severity.Error);
             return;
         }
 
@@ -154,26 +270,25 @@
 
         try
         {
-            var request = new DevTodoSaveRequest(
-                Form.Title,
-                Form.Notes,
-                Form.Status,
-                Form.DueDate is null ? null : DateOnly.FromDateTime(Form.DueDate.Value),
-                Form.SortOrder);
+            var request = new CatalogCategorySaveRequest(
+                CategoryForm.Name,
+                CategoryForm.Description,
+                CategoryForm.DisplayOrder);
 
-            if (Form.Id is Guid id)
+            if (CategoryForm.Id is Guid id)
             {
-                await TodoApi.UpdateAsync(id, request);
-                Snackbar.Add("Todo updated.", Severity.Success);
+                await CatalogApi.UpdateCategoryAsync(id, request);
+                Snackbar.Add("Category updated.", Severity.Success);
             }
             else
             {
-                await TodoApi.CreateAsync(request);
-                Snackbar.Add("Todo created.", Severity.Success);
+                var created = await CatalogApi.CreateCategoryAsync(request);
+                ProductForm.CategoryId = created.Id;
+                Snackbar.Add("Category created.", Severity.Success);
             }
 
             await LoadAsync();
-            ResetForm();
+            ResetCategoryForm();
         }
         catch (Exception ex)
         {
@@ -186,29 +301,123 @@
         }
     }
 
-    private void Edit(DevTodoItemDto item)
+    private async Task SaveProductAsync()
     {
-        Form = new DevTodoFormModel
+        if (ProductForm.CategoryId == Guid.Empty)
         {
-            Id = item.Id,
-            Title = item.Title,
-            Notes = item.Notes,
-            Status = item.Status,
-            DueDate = item.DueDate?.ToDateTime(TimeOnly.MinValue),
-            SortOrder = item.SortOrder,
+            Snackbar.Add("Category is required.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ProductForm.Name))
+        {
+            Snackbar.Add("Product name is required.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ProductForm.Sku))
+        {
+            Snackbar.Add("SKU is required.", Severity.Error);
+            return;
+        }
+
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var request = new CatalogProductSaveRequest(
+                ProductForm.CategoryId,
+                ProductForm.Name,
+                ProductForm.Sku,
+                ProductForm.Description,
+                ProductForm.Price,
+                ProductForm.StockQuantity,
+                ProductForm.IsActive);
+
+            if (ProductForm.Id is Guid id)
+            {
+                await CatalogApi.UpdateProductAsync(id, request);
+                Snackbar.Add("Product updated.", Severity.Success);
+            }
+            else
+            {
+                await CatalogApi.CreateProductAsync(request);
+                Snackbar.Add("Product created.", Severity.Success);
+            }
+
+            await LoadAsync();
+            ResetProductForm();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void EditCategory(CatalogCategoryDto category)
+    {
+        CategoryForm = new CatalogCategoryFormModel
+        {
+            Id = category.Id,
+            Name = category.Name,
+            Description = category.Description,
+            DisplayOrder = category.DisplayOrder,
         };
     }
 
-    private async Task DeleteAsync(Guid id)
+    private void EditProduct(CatalogProductDto product)
+    {
+        ProductForm = new CatalogProductFormModel
+        {
+            Id = product.Id,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Sku = product.Sku,
+            Description = product.Description,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity,
+            IsActive = product.IsActive,
+        };
+    }
+
+    private async Task ApplyCategoryFilterAsync(Guid categoryId)
+    {
+        CategoryFilter = categoryId;
+
+        if (ProductForm.Id is null)
+        {
+            ProductForm.CategoryId = categoryId;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task DeleteCategoryAsync(Guid id)
     {
         try
         {
-            await TodoApi.DeleteAsync(id);
-            Snackbar.Add("Todo deleted.", Severity.Success);
+            await CatalogApi.DeleteCategoryAsync(id);
+            Snackbar.Add("Category deleted.", Severity.Success);
 
-            if (Form.Id == id)
+            if (CategoryForm.Id == id)
             {
-                ResetForm();
+                ResetCategoryForm();
+            }
+
+            if (CategoryFilter == id)
+            {
+                CategoryFilter = null;
+            }
+
+            if (ProductForm.CategoryId == id)
+            {
+                ResetProductForm();
             }
 
             await LoadAsync();
@@ -220,46 +429,68 @@
         }
     }
 
-    private void ResetForm()
+    private async Task DeleteProductAsync(Guid id)
     {
-        Form = new DevTodoFormModel
+        try
         {
-            SortOrder = Items.Count + 1,
+            await CatalogApi.DeleteProductAsync(id);
+            Snackbar.Add("Product deleted.", Severity.Success);
+
+            if (ProductForm.Id == id)
+            {
+                ResetProductForm();
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private void ResetCategoryForm()
+    {
+        CategoryForm = new CatalogCategoryFormModel
+        {
+            DisplayOrder = (Categories.Count + 1) * 10,
         };
     }
 
-    private static string FormatDueDate(DateOnly? dueDate)
+    private void ResetProductForm()
     {
-        return dueDate?.ToString("yyyy-MM-dd") ?? "-";
-    }
-
-    private static string GetStatusLabel(DevTodoStatus status)
-    {
-        return status switch
+        ProductForm = new CatalogProductFormModel
         {
-            DevTodoStatus.InProgress => "In progress",
-            DevTodoStatus.Done => "Done",
-            _ => "Backlog",
+            CategoryId = CategoryFilter ?? Categories.FirstOrDefault()?.Id ?? Guid.Empty,
+            IsActive = true,
         };
     }
 
-    private static string GetStatusClass(DevTodoStatus status)
+    private static string GetProductStatusClass(bool isActive)
     {
-        return status switch
-        {
-            DevTodoStatus.InProgress => "dev-crud-status dev-crud-status-progress",
-            DevTodoStatus.Done => "dev-crud-status dev-crud-status-done",
-            _ => "dev-crud-status dev-crud-status-backlog",
-        };
+        return isActive
+            ? "dev-crud-status dev-crud-status-done"
+            : "dev-crud-status dev-crud-status-backlog";
     }
 
-    private sealed class DevTodoFormModel
+    private sealed class CatalogCategoryFormModel
     {
         public Guid? Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string? Notes { get; set; }
-        public DevTodoStatus Status { get; set; } = DevTodoStatus.Backlog;
-        public DateTime? DueDate { get; set; }
-        public int SortOrder { get; set; } = 1;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int DisplayOrder { get; set; } = 10;
+    }
+
+    private sealed class CatalogProductFormModel
+    {
+        public Guid? Id { get; set; }
+        public Guid CategoryId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

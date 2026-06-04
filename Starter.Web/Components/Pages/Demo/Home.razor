@@ -8,14 +8,14 @@
             <MudText Typo="Typo.overline" Class="starter-kicker">Enhanced Aspire app foundation</MudText>
             <MudText Typo="Typo.h3" HtmlTag="h1" Class="starter-title">Starter Workspace</MudText>
             <MudText Typo="Typo.body1" Class="starter-lead">
-                A ready-to-run .NET Aspire baseline with identity, admin modules, PostgreSQL, Redis, email capture, shared DTOs, migrations, and development CRUD.
+                A ready-to-run .NET Aspire baseline with identity, admin modules, PostgreSQL, Redis, email capture, shared DTOs, migrations, and catalog CRUD.
             </MudText>
             <MudStack Row="true" Spacing="2" Class="starter-actions">
                 <MudButton Href="/admin" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AdminPanelSettings">
                     Open admin
                 </MudButton>
-                <MudButton Href="/dev/crud" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableRows">
-                    Try CRUD
+                <MudButton Href="/dev/catalog" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Inventory2">
+                    Try Catalog
                 </MudButton>
                 <MudButton Href="/weather" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Cloud">
                     API sample
@@ -69,8 +69,8 @@
                     <MudText Typo="Typo.body2" Class="starter-muted">
                         The migration service owns schema setup and seed data while API and Web share PostgreSQL through Aspire service discovery.
                     </MudText>
-                    <MudButton Href="/dev/crud" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DataObject">
-                        Inspect CRUD
+                    <MudButton Href="/dev/catalog" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DataObject">
+                        Inspect Catalog
                     </MudButton>
                 </MudStack>
             </MudPaper>
@@ -140,7 +140,7 @@
     [
         new("Run the full stack", "Use Aspire AppHost to start PostgreSQL, Redis, pgAdmin, smtp4dev, API, Web, and migrations together."),
         new("Tune system settings", "Use Admin/System to configure self registration, email confirmation, public URL, and SMTP delivery."),
-        new("Replace demo slices", "Use the Dev CRUD module as the pattern for shared DTOs, Minimal API endpoints, Blazor pages, and migrations."),
+        new("Replace demo slices", "Use the Catalog CRUD module as the pattern for shared DTOs, Minimal API endpoints, Blazor pages, and migrations."),
         new("Keep CI green", "The GitHub workflow builds the solution and runs the Aspire integration smoke test."),
     ];
 

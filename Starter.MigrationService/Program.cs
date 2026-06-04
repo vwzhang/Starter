@@ -11,7 +11,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 
 builder.AddNpgsqlDbContext<ApplicationDbContext>("starterdb");
-builder.AddNpgsqlDbContext<DevTodoDbContext>("starterdb");
+builder.AddNpgsqlDbContext<CatalogDbContext>("starterdb");
 
 builder.Services.AddDataProtection();
 builder.Services
@@ -34,6 +34,8 @@ await host.RunAsync();
 internal sealed class Worker(
     IServiceProvider serviceProvider,
     IHostApplicationLifetime hostApplicationLifetime,
+    IConfiguration configuration,
+    IHostEnvironment hostEnvironment,
     ILogger<Worker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -42,21 +44,28 @@ internal sealed class Worker(
         {
             using var scope = serviceProvider.CreateScope();
             var applicationDbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var devTodoDbContext = scope.ServiceProvider.GetRequiredService<DevTodoDbContext>();
+            var catalogDbContext = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
 
             await BaselineExistingEnsureCreatedDatabaseAsync(applicationDbContext, logger, stoppingToken);
 
             logger.LogInformation("Applying application database migrations.");
             await applicationDbContext.Database.MigrateAsync(stoppingToken);
 
-            logger.LogInformation("Applying API CRUD database migrations.");
-            await devTodoDbContext.Database.MigrateAsync(stoppingToken);
+            logger.LogInformation("Applying API catalog database migrations.");
+            await catalogDbContext.Database.MigrateAsync(stoppingToken);
 
             logger.LogInformation("Seeding identity and admin data.");
             await scope.ServiceProvider.InitializeIdentityDataAsync(stoppingToken);
 
             logger.LogInformation("Seeding system configuration.");
             await scope.ServiceProvider.InitializeSystemConfigurationAsync(stoppingToken);
+
+            if (hostEnvironment.IsDevelopment()
+                && configuration.GetValue("Catalog:Seed:SampleData", true))
+            {
+                logger.LogInformation("Seeding catalog sample data.");
+                await catalogDbContext.SeedCatalogSampleDataAsync(logger, stoppingToken);
+            }
 
             logger.LogInformation("Database migration service completed.");
         }

@@ -3,17 +3,17 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Starter.ApiService.Data;
 
-public sealed class DevTodoDbContextFactory : IDesignTimeDbContextFactory<DevTodoDbContext>
+public sealed class CatalogDbContextFactory : IDesignTimeDbContextFactory<CatalogDbContext>
 {
-    public DevTodoDbContext CreateDbContext(string[] args)
+    public CatalogDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__starterdb")
             ?? "Host=localhost;Port=5432;Database=starterdb;Username=postgres;Password=postgres";
 
-        var options = new DbContextOptionsBuilder<DevTodoDbContext>()
+        var options = new DbContextOptionsBuilder<CatalogDbContext>()
             .UseNpgsql(connectionString)
             .Options;
 
-        return new DevTodoDbContext(options);
+        return new CatalogDbContext(options);
     }
 }

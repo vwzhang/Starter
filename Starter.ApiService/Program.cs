@@ -7,8 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-// Register the API-owned CRUD database context.
-builder.AddNpgsqlDbContext<DevTodoDbContext>("starterdb");
+// Register the API-owned catalog database context.
+builder.AddNpgsqlDbContext<CatalogDbContext>("starterdb");
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -44,7 +44,7 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
-app.MapDevTodoEndpoints();
+app.MapCatalogEndpoints();
 
 app.MapDefaultEndpoints();
 

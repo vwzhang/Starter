@@ -15,8 +15,8 @@
             <MudButton Href="/admin" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AdminPanelSettings">
                 Admin
             </MudButton>
-            <MudButton Href="/dev/crud" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableRows">
-                CRUD
+            <MudButton Href="/dev/catalog" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Inventory2">
+                Catalog
             </MudButton>
         </MudStack>
     </MudStack>
@@ -135,7 +135,7 @@
         new("8", "Resources", "AppHost-managed services", "+3", "trend-good", Icons.Material.Filled.Hub, "metric-primary"),
         new("3", "Seed users", "Admin, manager, user", "Ready", "trend-good", Icons.Material.Filled.Groups, "metric-green"),
         new("6", "Admin areas", "Users, roles, permissions, features, system", "Mapped", "trend-info", Icons.Material.Filled.AdminPanelSettings, "metric-blue"),
-        new("1", "CRUD slice", "Shared DTO + API + Blazor page", "Copy", "trend-info", Icons.Material.Filled.TableRows, "metric-slate"),
+        new("1", "Catalog slice", "Master/detail DTO + API + Blazor page", "Copy", "trend-info", Icons.Material.Filled.Inventory2, "metric-slate"),
     ];
 
     private static readonly DashboardService[] Services =
@@ -151,7 +151,7 @@
     [
         new("Replace template branding", "Update app name, README, screenshots, and package metadata.", Icons.Material.Filled.Badge),
         new("Choose auth defaults", "Set self registration and email confirmation defaults for your target audience.", Icons.Material.Filled.VerifiedUser),
-        new("Add first module", "Copy the CRUD slice and rename DTOs, endpoints, entity, page, and nav entry.", Icons.Material.Filled.AddCircle),
+        new("Add first module", "Copy the Catalog slice and rename DTOs, endpoints, entities, page, and nav entry.", Icons.Material.Filled.AddCircle),
         new("Publish safely", "Keep Docker-heavy smoke tests local or manually triggered in public CI.", Icons.Material.Filled.RocketLaunch),
     ];
 

@@ -46,37 +46,54 @@ public class WebTests
         var loginResponse = await httpClient.GetAsync("/admin/login", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
-        // Act + Assert: shared DTO CRUD API works against the migrated application database.
-        var createRequest = new DevTodoSaveRequest(
-            "CI smoke todo",
+        // Act + Assert: shared DTO catalog API works against the migrated application database.
+        var createCategoryRequest = new CatalogCategorySaveRequest(
+            "CI Catalog",
             "Created by Starter.Tests",
-            DevTodoStatus.Backlog,
-            null,
-            10);
-        var createResponse = await apiClient.PostAsJsonAsync("/dev/todos", createRequest, cancellationToken);
+            90);
+        var createCategoryResponse = await apiClient.PostAsJsonAsync("/dev/catalog/categories", createCategoryRequest, cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, createCategoryResponse.StatusCode);
+
+        var createdCategory = await createCategoryResponse.Content.ReadFromJsonAsync<CatalogCategoryDto>(cancellationToken);
+        Assert.NotNull(createdCategory);
+        Assert.Equal(createCategoryRequest.Name, createdCategory.Name);
+
+        var createRequest = new CatalogProductSaveRequest(
+            createdCategory.Id,
+            "CI Smoke Product",
+            "CI-SMOKE-PRODUCT",
+            "Created by Starter.Tests",
+            12.34m,
+            5,
+            true);
+        var createResponse = await apiClient.PostAsJsonAsync("/dev/catalog/products", createRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        var createdTodo = await createResponse.Content.ReadFromJsonAsync<DevTodoItemDto>(cancellationToken);
-        Assert.NotNull(createdTodo);
-        Assert.Equal(createRequest.Title, createdTodo.Title);
+        var createdProduct = await createResponse.Content.ReadFromJsonAsync<CatalogProductDto>(cancellationToken);
+        Assert.NotNull(createdProduct);
+        Assert.Equal(createRequest.Name, createdProduct.Name);
+        Assert.Equal(createCategoryRequest.Name, createdProduct.CategoryName);
 
         var updateRequest = createRequest with
         {
-            Status = DevTodoStatus.Done,
-            Notes = "Updated by Starter.Tests",
+            Price = 23.45m,
+            StockQuantity = 8,
         };
-        var updateResponse = await apiClient.PutAsJsonAsync($"/dev/todos/{createdTodo.Id}", updateRequest, cancellationToken);
+        var updateResponse = await apiClient.PutAsJsonAsync($"/dev/catalog/products/{createdProduct.Id}", updateRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        var updatedTodo = await updateResponse.Content.ReadFromJsonAsync<DevTodoItemDto>(cancellationToken);
-        Assert.NotNull(updatedTodo);
-        Assert.Equal(DevTodoStatus.Done, updatedTodo.Status);
+        var updatedProduct = await updateResponse.Content.ReadFromJsonAsync<CatalogProductDto>(cancellationToken);
+        Assert.NotNull(updatedProduct);
+        Assert.Equal(updateRequest.Price, updatedProduct.Price);
 
-        var list = await apiClient.GetFromJsonAsync<DevTodoItemDto[]>("/dev/todos?search=CI%20smoke", cancellationToken);
-        Assert.Contains(list ?? [], todo => todo.Id == createdTodo.Id);
+        var list = await apiClient.GetFromJsonAsync<CatalogProductDto[]>("/dev/catalog/products?search=CI%20Smoke", cancellationToken);
+        Assert.Contains(list ?? [], product => product.Id == createdProduct.Id);
 
-        var deleteResponse = await apiClient.DeleteAsync($"/dev/todos/{createdTodo.Id}", cancellationToken);
+        var deleteResponse = await apiClient.DeleteAsync($"/dev/catalog/products/{createdProduct.Id}", cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var deleteCategoryResponse = await apiClient.DeleteAsync($"/dev/catalog/categories/{createdCategory.Id}", cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, deleteCategoryResponse.StatusCode);
 
         // Act + Assert: forgot-password uses the seeded SMTP settings and is captured by smtp4dev.
         var forgotResponse = await httpClient.PostAsync(

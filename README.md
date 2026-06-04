@@ -27,7 +27,7 @@ This repository is meant to be cloned or used as a GitHub template when you want
 | Account flows | Self registration, configurable email confirmation, forgot/reset password |
 | Admin | Users, roles, permissions, features, and system configuration |
 | Email | SMTP settings, protected SMTP secret storage, smtp4dev local inbox |
-| Developer samples | Copyable CRUD vertical slice with shared DTOs and database-backed API endpoints |
+| Developer samples | Copyable catalog master-detail slice with shared DTOs and database-backed API endpoints |
 | Quality | GitHub Actions CI and local/manual Aspire integration smoke test |
 
 ## Architecture
@@ -38,7 +38,7 @@ flowchart LR
     AppHost --> Api["Starter.ApiService<br/>Minimal API"]
     AppHost --> Migrations["Starter.MigrationService"]
     AppHost --> Redis["Redis cache"]
-    AppHost --> Postgres["PostgreSQL 18"]
+    AppHost --> Postgres["PostgreSQL 18<br/>Identity, settings, catalog"]
     AppHost --> PgAdmin["pgAdmin"]
     AppHost --> Smtp["smtp4dev"]
 
@@ -71,7 +71,7 @@ Common local URLs:
 | --- | --- |
 | Web | `https://localhost:7131` |
 | Starter workspace | `https://localhost:7131/` |
-| Dev CRUD sample | `https://localhost:7131/dev/crud` |
+| Catalog CRUD sample | `https://localhost:7131/dev/catalog` |
 | pgAdmin | `http://localhost:5050` |
 | smtp4dev | `http://localhost:5080` |
 | Aspire Dashboard | Shown by `aspire start` |
@@ -133,30 +133,35 @@ Development defaults:
 
 Use `http://localhost:5080` to view captured messages. Forgot password and email confirmation flows are both wired to the configured account email sender.
 
-## Dev CRUD Module
+## Catalog CRUD Module
 
-The Dev CRUD module is a copyable vertical slice:
+The Catalog CRUD module is a copyable master-detail vertical slice:
 
-- DTOs: `Starter.Shared/DevTodoDtos.cs`
-- Entity: `Starter.ApiService/Data/DevTodoItem.cs`
-- EF configuration: `Starter.ApiService/Data/DevTodoDbContext.cs`
-- Migration: `Starter.ApiService/Data/Migrations/*_DevTodoCrud.cs`
-- API endpoints: `Starter.ApiService/DevTodoEndpoints.cs`
-- Web client: `Starter.Web/DevTodoApiClient.cs`
+- DTOs: `Starter.Shared/CatalogDtos.cs`
+- Entities: `Starter.ApiService/Data/CatalogCategory.cs`, `Starter.ApiService/Data/CatalogProduct.cs`
+- EF configuration: `Starter.ApiService/Data/CatalogDbContext.cs`
+- Migration: `Starter.ApiService/Data/Migrations/*_CatalogCrud.cs`
+- Sample data: `Starter.ApiService/Data/CatalogSeedExtensions.cs`
+- API endpoints: `Starter.ApiService/CatalogEndpoints.cs`
+- Web client: `Starter.Web/CatalogApiClient.cs`
 - Blazor page: `Starter.Web/Components/Pages/Dev/Crud.razor`
 - Navigation: `Starter.Web/Components/Pages/Dev/DevNav.razor`
 
 API endpoints:
 
 ```text
-GET    /dev/todos
-GET    /dev/todos/{id}
-POST   /dev/todos
-PUT    /dev/todos/{id}
-DELETE /dev/todos/{id}
+GET    /dev/catalog/categories
+POST   /dev/catalog/categories
+PUT    /dev/catalog/categories/{id}
+DELETE /dev/catalog/categories/{id}
+
+GET    /dev/catalog/products
+POST   /dev/catalog/products
+PUT    /dev/catalog/products/{id}
+DELETE /dev/catalog/products/{id}
 ```
 
-To create a real feature module, keep the UI in Web, own the data model and EF migration in ApiService, and share request/response DTOs through Starter.Shared.
+To create a real feature module, keep the UI in Web, own the data model and EF migration in ApiService, and share request/response DTOs through Starter.Shared. The migration service seeds catalog sample data in Development; set `Catalog:Seed:SampleData=false` to disable it.
 
 ## Project Layout
 
