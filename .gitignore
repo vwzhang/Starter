@@ -12,6 +12,7 @@
 .claude/
 .codex/
 .playwright-cli/
+AGENTS.md
 *.user
 *.suo
 *.userosscache
