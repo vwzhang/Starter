@@ -22,7 +22,7 @@ const string PgAdminDefaultEmail = "admin@domain.com";
 const string PgAdminDefaultPassword = "Happy1..";
 //#endif
 
-// PostgreSQL 18 server with a persistent data volume and pgAdmin dashboard.
+// PostgreSQL 18 server with a persistent data volume.
 var postgres = builder.AddPostgres("postgres")
     .WithImageTag("18")
     .WithDataVolume();
