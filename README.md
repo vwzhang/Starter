@@ -1,4 +1,4 @@
-# Enhanced Aspire Starter
+# Aspire Admin Starter
 
 [![CI](https://github.com/vwzhang/Starter/actions/workflows/ci.yml/badge.svg)](https://github.com/vwzhang/Starter/actions/workflows/ci.yml)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
@@ -8,13 +8,13 @@
 ![Identity](https://img.shields.io/badge/Auth-ASP.NET%20Core%20Identity-0E7C7B)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A polished .NET 10 Aspire starter for internal tools, admin portals, and full-stack business apps. It gives you the infrastructure most projects need on day one: authentication, role-based admin pages, runtime settings, PostgreSQL, Redis, local email capture, migrations, a Minimal API, a Blazor frontend, shared DTOs, and a real database-backed CRUD slice.
+A polished .NET 10 Aspire admin starter for internal tools, admin portals, and full-stack business apps. It gives you the infrastructure most projects need on day one: authentication, role-based admin pages, runtime settings, PostgreSQL, Redis, local email capture, migrations, a Minimal API, a Blazor frontend, shared DTOs, and a real database-backed CRUD slice.
 
 ![Starter Workspace](docs/assets/starter-workspace.png)
 
 ## Why Use This
 
-Starting from a blank Aspire template is clean, but the first useful app usually needs the same foundation again and again. Enhanced Aspire Starter packages that foundation into a working application you can run, inspect, rename, and extend.
+Starting from a blank Aspire template is clean, but the first useful admin app usually needs the same foundation again and again. Aspire Admin Starter packages that foundation into a working application you can run, inspect, rename, and extend.
 
 | What you need | Already included |
 | --- | --- |
@@ -78,7 +78,7 @@ After installing the template package, create a new app with:
 ```powershell
 mkdir C:\Code\AcmeOps
 cd C:\Code\AcmeOps
-dotnet new enhanced-aspire-starter -n AcmeOps
+dotnet new aspire-admin-starter -n AcmeOps
 dotnet build AcmeOps.slnx
 aspire start --apphost AcmeOps.AppHost/AcmeOps.AppHost.csproj
 ```
@@ -88,7 +88,7 @@ The project folders are created directly in the current directory, so `AcmeOps.A
 The template has practical switches so each project can start with the right local shape:
 
 ```powershell
-dotnet new enhanced-aspire-starter `
+dotnet new aspire-admin-starter `
   -n AcmeOps `
   --database-name acmeopsdb `
   --include-pgadmin true `
