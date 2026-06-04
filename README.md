@@ -76,18 +76,20 @@ https://github.com/vwzhang/Starter.Template
 After installing the template package, create a new app with:
 
 ```powershell
-dotnet new enhanced-aspire-starter -n AcmeOps -o C:\Code\AcmeOps
+mkdir C:\Code\AcmeOps
 cd C:\Code\AcmeOps
+dotnet new enhanced-aspire-starter -n AcmeOps
 dotnet build AcmeOps.slnx
 aspire start --apphost AcmeOps.AppHost/AcmeOps.AppHost.csproj
 ```
+
+The project folders are created directly in the current directory, so `AcmeOps.AppHost`, `AcmeOps.Web`, `AcmeOps.ApiService`, and the solution file all sit at the solution root.
 
 The template has practical switches so each project can start with the right local shape:
 
 ```powershell
 dotnet new enhanced-aspire-starter `
   -n AcmeOps `
-  -o C:\Code\AcmeOps `
   --database-name acmeopsdb `
   --include-pgadmin true `
   --include-smtp4dev true `
