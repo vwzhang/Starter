@@ -149,7 +149,7 @@
 
     private static readonly DashboardTask[] Tasks =
     [
-        new("Replace template branding", "Update app name, README, screenshots, and package metadata.", Icons.Material.Filled.Badge),
+        new("Confirm project branding", "Review app name, README, screenshots, and package metadata.", Icons.Material.Filled.Badge),
         new("Choose auth defaults", "Set self registration and email confirmation defaults for your target audience.", Icons.Material.Filled.VerifiedUser),
         new("Add first module", "Copy the Catalog slice and rename DTOs, endpoints, entities, page, and nav entry.", Icons.Material.Filled.AddCircle),
         new("Publish safely", "Keep Docker-heavy smoke tests local or manually triggered in public CI.", Icons.Material.Filled.RocketLaunch),
@@ -160,7 +160,7 @@
         new("Migration service completed", "Schema and seed data are owned by the dedicated migration worker.", Color.Success),
         new("Email capture configured", "smtp4dev is wired through system configuration in Development.", Color.Info),
         new("Admin module enabled", "Role and permission policies protect administrative pages.", Color.Primary),
-        new("Template polish applied", "Workspace, navigation, README, CI, and screenshot are publication-ready.", Color.Warning),
+        new("Project polish applied", "Workspace, navigation, README, CI, and screenshot are publication-ready.", Color.Warning),
     ];
 
     private sealed record DashboardMetric(
