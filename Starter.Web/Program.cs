@@ -75,6 +75,8 @@ builder.Services.AddHttpClient<CatalogApiClient>(client =>
     {
         client.BaseAddress = new("https+http://apiservice");
     });
+builder.Services.AddHttpClient<AiChatService>();
+builder.Services.AddHttpClient<AiModelCatalogService>();
 
 var app = builder.Build();
 

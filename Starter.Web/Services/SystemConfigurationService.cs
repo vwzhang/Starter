@@ -169,9 +169,120 @@ public sealed class SystemConfigurationService(
             await GetValueAsync(SystemConfigurationKeys.EmailSmtpPassword));
     }
 
+    public async Task<AiApiSettings> GetAiApiSettingsAsync()
+    {
+        var currentProvider = await GetValueAsync(SystemConfigurationKeys.AiCurrentProvider);
+
+        return new AiApiSettings(
+            currentProvider.Trim().ToLowerInvariant(),
+            await GetValueAsync(SystemConfigurationKeys.AiSystemPrompt),
+            [
+                new(
+                    AiApiProviderKeys.OpenAi,
+                    "ChatGPT",
+                    await GetValueAsync(SystemConfigurationKeys.AiOpenAiEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiOpenAiModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiOpenAiApiKey)),
+                new(
+                    AiApiProviderKeys.Gemini,
+                    "Gemini",
+                    await GetValueAsync(SystemConfigurationKeys.AiGeminiEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiGeminiModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiGeminiApiKey)),
+                new(
+                    AiApiProviderKeys.GitHub,
+                    "GitHub Models",
+                    await GetValueAsync(SystemConfigurationKeys.AiGitHubEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiGitHubModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiGitHubApiKey)),
+                new(
+                    AiApiProviderKeys.Groq,
+                    "Groq",
+                    await GetValueAsync(SystemConfigurationKeys.AiGroqEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiGroqModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiGroqApiKey)),
+                new(
+                    AiApiProviderKeys.AzureFoundry,
+                    "Azure Foundry",
+                    await GetValueAsync(SystemConfigurationKeys.AiAzureFoundryEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiAzureFoundryModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiAzureFoundryApiKey)),
+            ]);
+    }
+
+    public async Task<AdminMutationResult> SaveAiApiSettingsAsync(AiApiConfigurationUpdate update)
+    {
+        var providerKeys = update.Providers.Select(provider => provider.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!providerKeys.Contains(update.CurrentProvider))
+        {
+            return AdminMutationResult.Failure("Current AI provider is not valid.");
+        }
+
+        var updates = new List<(string Key, string Value)>
+        {
+            (SystemConfigurationKeys.AiCurrentProvider, update.CurrentProvider),
+            (SystemConfigurationKeys.AiSystemPrompt, update.SystemPrompt),
+        };
+
+        foreach (var provider in update.Providers)
+        {
+            var keys = GetAiProviderSettingKeys(provider.Key);
+            if (keys is null)
+            {
+                return AdminMutationResult.Failure($"Unknown AI provider '{provider.Key}'.");
+            }
+
+            updates.Add((keys.Value.EndpointKey, provider.Endpoint));
+            updates.Add((keys.Value.ModelKey, provider.Model));
+            updates.Add((keys.Value.ApiKeyKey, provider.ApiKey));
+        }
+
+        foreach (var item in updates)
+        {
+            var result = await SaveSettingValueAsync(item.Key, item.Value);
+            if (!result.Succeeded)
+            {
+                return result;
+            }
+        }
+
+        return AdminMutationResult.Success("AI API configuration saved.");
+    }
+
     private async Task<bool> GetBooleanAsync(string key)
     {
         return bool.TryParse(await GetValueAsync(key), out var value) && value;
+    }
+
+    private async Task<AdminMutationResult> SaveSettingValueAsync(string key, string value)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var setting = await dbContext.Settings.SingleOrDefaultAsync(item => item.Key == key);
+
+        if (setting is null)
+        {
+            return AdminMutationResult.Failure($"Setting '{key}' not found.");
+        }
+
+        var normalizedValue = NormalizeValue(value, setting.ValueType);
+
+        if (normalizedValue is null)
+        {
+            return AdminMutationResult.Failure($"Value for '{setting.Name}' does not match the setting type.");
+        }
+
+        if (setting.ValueType == SystemConfigurationValueTypes.Secret
+            && string.IsNullOrEmpty(normalizedValue))
+        {
+            return AdminMutationResult.Success("Setting saved.");
+        }
+
+        setting.Value = GetStoredValue(normalizedValue, setting.ValueType);
+        setting.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        return AdminMutationResult.Success("Setting saved.");
     }
 
     private async Task<string> GetValueAsync(string key)
@@ -197,6 +308,142 @@ public sealed class SystemConfigurationService(
 
         return
         [
+            new(
+                SystemConfigurationKeys.AiCurrentProvider,
+                "Current AI provider",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                AiApiProviderKeys.OpenAi,
+                AiApiProviderKeys.OpenAi,
+                "Provider used by the AI chat page."),
+            new(
+                SystemConfigurationKeys.AiSystemPrompt,
+                "AI system prompt",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "You are a helpful assistant for this .NET Aspire starter application.",
+                "You are a helpful assistant for this .NET Aspire starter application.",
+                "System prompt sent with every AI chat request."),
+            new(
+                SystemConfigurationKeys.AiOpenAiEndpoint,
+                "ChatGPT endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "https://api.openai.com/v1/chat/completions",
+                "https://api.openai.com/v1/chat/completions",
+                "OpenAI Chat Completions endpoint."),
+            new(
+                SystemConfigurationKeys.AiOpenAiModel,
+                "ChatGPT model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "OpenAI model name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiOpenAiApiKey,
+                "ChatGPT API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "OpenAI API key."),
+            new(
+                SystemConfigurationKeys.AiGeminiEndpoint,
+                "Gemini endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                "Gemini OpenAI-compatible Chat Completions endpoint."),
+            new(
+                SystemConfigurationKeys.AiGeminiModel,
+                "Gemini model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "Gemini model name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiGeminiApiKey,
+                "Gemini API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "Gemini API key."),
+            new(
+                SystemConfigurationKeys.AiGitHubEndpoint,
+                "GitHub Models endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "https://models.github.ai/inference/chat/completions",
+                "https://models.github.ai/inference/chat/completions",
+                "GitHub Models Chat Completions endpoint."),
+            new(
+                SystemConfigurationKeys.AiGitHubModel,
+                "GitHub Models model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "GitHub Models model name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiGitHubApiKey,
+                "GitHub Models API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "GitHub personal access token or model access token."),
+            new(
+                SystemConfigurationKeys.AiGroqEndpoint,
+                "Groq endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "https://api.groq.com/openai/v1/chat/completions",
+                "https://api.groq.com/openai/v1/chat/completions",
+                "Groq OpenAI-compatible Chat Completions endpoint."),
+            new(
+                SystemConfigurationKeys.AiGroqModel,
+                "Groq model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "Groq model name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiGroqApiKey,
+                "Groq API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "Groq API key."),
+            new(
+                SystemConfigurationKeys.AiAzureFoundryEndpoint,
+                "Azure Foundry endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "Azure Foundry or Azure OpenAI chat completions/responses endpoint."),
+            new(
+                SystemConfigurationKeys.AiAzureFoundryModel,
+                "Azure Foundry model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "",
+                "",
+                "Azure Foundry model or deployment name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiAzureFoundryApiKey,
+                "Azure Foundry API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "Azure Foundry or Azure OpenAI API key."),
             new(
                 SystemConfigurationKeys.SelfRegistrationEnabled,
                 "Self registration",
@@ -303,6 +550,39 @@ public sealed class SystemConfigurationService(
                 "Use TLS/SSL for SMTP email delivery."),
         ];
     }
+
+    private static AiProviderSettingKeys? GetAiProviderSettingKeys(string providerKey)
+    {
+        return providerKey.ToLowerInvariant() switch
+        {
+            AiApiProviderKeys.OpenAi => new(
+                SystemConfigurationKeys.AiOpenAiEndpoint,
+                SystemConfigurationKeys.AiOpenAiModel,
+                SystemConfigurationKeys.AiOpenAiApiKey),
+            AiApiProviderKeys.Gemini => new(
+                SystemConfigurationKeys.AiGeminiEndpoint,
+                SystemConfigurationKeys.AiGeminiModel,
+                SystemConfigurationKeys.AiGeminiApiKey),
+            AiApiProviderKeys.GitHub => new(
+                SystemConfigurationKeys.AiGitHubEndpoint,
+                SystemConfigurationKeys.AiGitHubModel,
+                SystemConfigurationKeys.AiGitHubApiKey),
+            AiApiProviderKeys.Groq => new(
+                SystemConfigurationKeys.AiGroqEndpoint,
+                SystemConfigurationKeys.AiGroqModel,
+                SystemConfigurationKeys.AiGroqApiKey),
+            AiApiProviderKeys.AzureFoundry => new(
+                SystemConfigurationKeys.AiAzureFoundryEndpoint,
+                SystemConfigurationKeys.AiAzureFoundryModel,
+                SystemConfigurationKeys.AiAzureFoundryApiKey),
+            _ => null,
+        };
+    }
+
+    private readonly record struct AiProviderSettingKeys(
+        string EndpointKey,
+        string ModelKey,
+        string ApiKeyKey);
 
     private string GetDefaultValue(SystemConfigurationDefinition definition)
     {

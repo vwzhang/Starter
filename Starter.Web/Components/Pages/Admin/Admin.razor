@@ -396,7 +396,9 @@
         Roles = await AdminIdentity.GetRolesAsync();
         Users = await AdminIdentity.GetUsersAsync();
         SystemSettings = CanManageSystem
-            ? await SystemConfiguration.GetSettingsAsync()
+            ? (await SystemConfiguration.GetSettingsAsync())
+                .Where(setting => setting.Category != "AI")
+                .ToList()
             : [];
 
         if (PermissionForm.FeatureId == 0)

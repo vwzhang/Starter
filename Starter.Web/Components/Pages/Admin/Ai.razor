@@ -1,0 +1,413 @@
+@page "/admin/ai"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
+@inject SystemConfigurationService SystemConfiguration
+@inject AiModelCatalogService ModelCatalog
+@inject ISnackbar Snackbar
+
+<PageTitle>AI API Configuration</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap">
+        <div>
+            <MudText Typo="Typo.h4">AI API Configuration</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Configure the AI client used by the AI chat page.</MudText>
+        </div>
+        <MudSpacer />
+        <MudButton Href="/ai-chat" Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Psychology">
+            Open AI Chat
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="@(!CanSave)">
+            Save
+        </MudButton>
+    </MudStack>
+
+    @if (IsLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">@ErrorMessage</MudAlert>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4 starter-card" Outlined="true">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Api" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1">Current API client</MudText>
+                        </MudStack>
+
+                        <MudSelect T="string" Label="Provider" Value="@Form.CurrentProvider" ValueChanged="SelectProvider" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var provider in Form.Providers)
+                            {
+                                <MudSelectItem T="string" Value="@provider.Key">@provider.DisplayName</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudTextField Label="System prompt" @bind-Value="Form.SystemPrompt" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Immediate="true" />
+
+                        @{
+                            var selectedProvider = Form.SelectedProvider;
+                        }
+
+                        @if (selectedProvider is not null)
+                        {
+                            <MudDivider />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Selected provider status</MudText>
+                            <MudChip T="string" Color="@(selectedProvider.IsConfigured ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
+                                @(selectedProvider.IsConfigured ? "Ready" : "Missing settings")
+                            </MudChip>
+                            <MudText Typo="Typo.body2" Class="starter-muted">@selectedProvider.DisplayName</MudText>
+                            <MudText Typo="Typo.body2" Class="ai-chat-value">@GetConfiguredSummary(selectedProvider)</MudText>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4 starter-card" Outlined="true">
+                    <MudTabs ActivePanelIndex="@ActiveProviderIndex" ActivePanelIndexChanged="SelectProviderTab" Rounded="true" Border="true" Elevation="0">
+                        @foreach (var provider in Form.Providers)
+                        {
+                            <MudTabPanel Text="@provider.DisplayName" Icon="@Icons.Material.Filled.Key">
+                                <MudStack Spacing="3">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap">
+                                        <MudText Typo="Typo.subtitle1">@provider.DisplayName</MudText>
+                                        <MudChip T="string" Color="@(provider.IsConfigured ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
+                                            @(provider.IsConfigured ? "Configured" : "Incomplete")
+                                        </MudChip>
+                                        <MudSpacer />
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.CloudDownload"
+                                                   OnClick="@(() => LoadModelsAsync(provider))" Disabled="@provider.IsLoadingModels">
+                                            Load models
+                                        </MudButton>
+                                        @if (provider.IsLoadingModels)
+                                        {
+                                            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                                        }
+                                    </MudStack>
+
+                                    <MudTextField Label="Endpoint" @bind-Value="provider.Endpoint" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                    @if (provider.Models.Count > 0)
+                                    {
+                                        <MudSelect T="string" Label="Model" Value="@provider.Model" ValueChanged="@((value) => SelectModel(provider, value))" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                            @if (!string.IsNullOrWhiteSpace(provider.Model)
+                                                && !provider.Models.Any(model => string.Equals(model.Id, provider.Model, StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <MudSelectItem T="string" Value="@provider.Model">@provider.Model</MudSelectItem>
+                                            }
+                                            @foreach (var model in provider.Models)
+                                            {
+                                                <MudSelectItem T="string" Value="@model.Id">@GetModelLabel(model)</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    }
+                                    else
+                                    {
+                                        <MudTextField Label="Model" @bind-Value="provider.Model" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                    }
+                                    <MudTextField Label="@GetApiKeyLabel(provider)" @bind-Value="provider.ApiKey" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Immediate="true" />
+
+                                    @if (provider.ApiKeyConfigured)
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                            API key is already configured. Leave the field blank to keep it unchanged.
+                                        </MudAlert>
+                                    }
+                                </MudStack>
+                            </MudTabPanel>
+                        }
+                    </MudTabs>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    private AiConfigurationForm Form { get; set; } = new();
+    private Dictionary<string, SystemConfigurationSummary> SettingsByKey { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+    private bool IsSaving { get; set; }
+    private int ActiveProviderIndex { get; set; }
+    private bool CanSave => !IsLoading && !IsSaving && string.IsNullOrWhiteSpace(ErrorMessage);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var settings = await SystemConfiguration.GetSettingsAsync();
+            SettingsByKey = settings
+                .Where(setting => setting.Category == "AI")
+                .ToDictionary(setting => setting.Key);
+
+            Form = new AiConfigurationForm
+            {
+                CurrentProvider = GetValue(SystemConfigurationKeys.AiCurrentProvider),
+                SystemPrompt = GetValue(SystemConfigurationKeys.AiSystemPrompt),
+                Providers =
+                [
+                    CreateProvider(
+                        AiApiProviderKeys.OpenAi,
+                        "ChatGPT",
+                        SystemConfigurationKeys.AiOpenAiEndpoint,
+                        SystemConfigurationKeys.AiOpenAiModel,
+                        SystemConfigurationKeys.AiOpenAiApiKey),
+                    CreateProvider(
+                        AiApiProviderKeys.Gemini,
+                        "Gemini",
+                        SystemConfigurationKeys.AiGeminiEndpoint,
+                        SystemConfigurationKeys.AiGeminiModel,
+                        SystemConfigurationKeys.AiGeminiApiKey),
+                    CreateProvider(
+                        AiApiProviderKeys.GitHub,
+                        "GitHub Models",
+                        SystemConfigurationKeys.AiGitHubEndpoint,
+                        SystemConfigurationKeys.AiGitHubModel,
+                        SystemConfigurationKeys.AiGitHubApiKey),
+                    CreateProvider(
+                        AiApiProviderKeys.Groq,
+                        "Groq",
+                        SystemConfigurationKeys.AiGroqEndpoint,
+                        SystemConfigurationKeys.AiGroqModel,
+                        SystemConfigurationKeys.AiGroqApiKey),
+                    CreateProvider(
+                        AiApiProviderKeys.AzureFoundry,
+                        "Azure Foundry",
+                        SystemConfigurationKeys.AiAzureFoundryEndpoint,
+                        SystemConfigurationKeys.AiAzureFoundryModel,
+                        SystemConfigurationKeys.AiAzureFoundryApiKey),
+                ],
+            };
+
+            ActiveProviderIndex = GetProviderIndex(Form.CurrentProvider);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        IsSaving = true;
+
+        try
+        {
+            var result = await SystemConfiguration.SaveAiApiSettingsAsync(new AiApiConfigurationUpdate(
+                Form.CurrentProvider,
+                Form.SystemPrompt,
+                Form.Providers
+                    .Select(provider => new AiApiProviderConfigurationUpdate(
+                        provider.Key,
+                        provider.Endpoint,
+                        provider.Model,
+                        provider.ApiKey))
+                    .ToList()));
+
+            if (result.Succeeded)
+            {
+                Snackbar.Add(result.Message, Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void SelectProvider(string providerKey)
+    {
+        Form.CurrentProvider = providerKey;
+        ActiveProviderIndex = GetProviderIndex(providerKey);
+    }
+
+    private void SelectProviderTab(int index)
+    {
+        ActiveProviderIndex = index;
+
+        if (index >= 0 && index < Form.Providers.Count)
+        {
+            Form.CurrentProvider = Form.Providers[index].Key;
+        }
+    }
+
+    private static void SelectModel(AiProviderConfigurationForm provider, string model)
+    {
+        provider.Model = model;
+    }
+
+    private async Task LoadModelsAsync(AiProviderConfigurationForm provider)
+    {
+        provider.IsLoadingModels = true;
+
+        try
+        {
+            var models = await ModelCatalog.GetModelsAsync(new AiModelCatalogRequest(
+                provider.Key,
+                provider.Endpoint,
+                provider.ApiKey));
+
+            provider.Models = models.ToList();
+
+            if (provider.Models.Count == 0)
+            {
+                Snackbar.Add($"{provider.DisplayName} did not return any models.", Severity.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.Model))
+            {
+                provider.Model = GetPreferredModel(provider);
+            }
+
+            Snackbar.Add($"Loaded {provider.Models.Count} {provider.DisplayName} models.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            provider.IsLoadingModels = false;
+        }
+    }
+
+    private AiProviderConfigurationForm CreateProvider(
+        string key,
+        string displayName,
+        string endpointKey,
+        string modelKey,
+        string apiKeyKey)
+    {
+        return new AiProviderConfigurationForm
+        {
+            Key = key,
+            DisplayName = displayName,
+            EndpointKey = endpointKey,
+            ModelKey = modelKey,
+            ApiKeyKey = apiKeyKey,
+            Endpoint = GetValue(endpointKey),
+            Model = GetValue(modelKey),
+            ApiKeyConfigured = !string.IsNullOrWhiteSpace(GetValue(apiKeyKey)),
+        };
+    }
+
+    private string GetValue(string key)
+    {
+        return SettingsByKey.TryGetValue(key, out var setting)
+            ? setting.Value
+            : string.Empty;
+    }
+
+    private int GetProviderIndex(string providerKey)
+    {
+        var index = Form.Providers.FindIndex(provider =>
+            string.Equals(provider.Key, providerKey, StringComparison.OrdinalIgnoreCase));
+
+        return index < 0 ? 0 : index;
+    }
+
+    private static string GetApiKeyLabel(AiProviderConfigurationForm provider)
+    {
+        return provider.ApiKeyConfigured ? "API key (configured)" : "API key";
+    }
+
+    private static string GetModelLabel(AiModelSummary model)
+    {
+        return string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName == model.Id
+            ? model.Id
+            : $"{model.DisplayName} ({model.Id})";
+    }
+
+    private static string GetPreferredModel(AiProviderConfigurationForm provider)
+    {
+        if (provider.Key == AiApiProviderKeys.GitHub)
+        {
+            var githubQuickstartModel = provider.Models.FirstOrDefault(model =>
+                string.Equals(model.Id, "openai/gpt-4.1", StringComparison.OrdinalIgnoreCase));
+
+            if (githubQuickstartModel is not null)
+            {
+                return githubQuickstartModel.Id;
+            }
+        }
+
+        return provider.Models[0].Id;
+    }
+
+    private static string GetConfiguredSummary(AiProviderConfigurationForm provider)
+    {
+        var missing = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(provider.Endpoint))
+        {
+            missing.Add("endpoint");
+        }
+
+        if (string.IsNullOrWhiteSpace(provider.Model))
+        {
+            missing.Add("model");
+        }
+
+        if (!provider.ApiKeyConfigured && string.IsNullOrWhiteSpace(provider.ApiKey))
+        {
+            missing.Add("API key");
+        }
+
+        return missing.Count == 0
+            ? "Endpoint, model, and API key are configured."
+            : $"Missing {string.Join(", ", missing)}.";
+    }
+
+    private sealed class AiConfigurationForm
+    {
+        public string CurrentProvider { get; set; } = AiApiProviderKeys.OpenAi;
+        public string SystemPrompt { get; set; } = string.Empty;
+        public List<AiProviderConfigurationForm> Providers { get; set; } = [];
+
+        public AiProviderConfigurationForm? SelectedProvider =>
+            Providers.FirstOrDefault(provider => string.Equals(provider.Key, CurrentProvider, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed class AiProviderConfigurationForm
+    {
+        public string Key { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string EndpointKey { get; set; } = string.Empty;
+        public string ModelKey { get; set; } = string.Empty;
+        public string ApiKeyKey { get; set; } = string.Empty;
+        public string Endpoint { get; set; } = string.Empty;
+        public string Model { get; set; } = string.Empty;
+        public string ApiKey { get; set; } = string.Empty;
+        public bool ApiKeyConfigured { get; set; }
+        public bool IsLoadingModels { get; set; }
+        public List<AiModelSummary> Models { get; set; } = [];
+
+        public bool IsConfigured =>
+            !string.IsNullOrWhiteSpace(Endpoint)
+            && !string.IsNullOrWhiteSpace(Model)
+            && (ApiKeyConfigured || !string.IsNullOrWhiteSpace(ApiKey));
+    }
+}

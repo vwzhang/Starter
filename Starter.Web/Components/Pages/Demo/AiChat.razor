@@ -1,0 +1,231 @@
+@page "/ai-chat"
+@inject AiChatService AiChatClient
+@inject ISnackbar Snackbar
+
+<PageTitle>AI Chat</PageTitle>
+
+<MudStack Spacing="3" Class="ai-chat-page">
+    <MudPaper Class="ai-chat-header" Outlined="true">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap">
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" />
+            </MudAvatar>
+            <div class="ai-chat-title">
+                <MudText Typo="Typo.h5">AI Chat</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Current client is managed from Admin AI APIs.</MudText>
+            </div>
+            <MudSpacer />
+            @if (Status is not null)
+            {
+                <MudChip T="string" Color="@(Status.IsConfigured ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
+                    @(Status.Provider ?? "AI")
+                </MudChip>
+                <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">
+                    @(Status.Model ?? "No model")
+                </MudChip>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadStatusAsync" Disabled="IsLoading">
+                Refresh
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">@ErrorMessage</MudAlert>
+    }
+
+    @if (Status is null)
+    {
+        <MudPaper Class="ai-chat-shell" Outlined="true">
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="ai-chat-shell" Outlined="true">
+            @if (!Status.IsConfigured)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="ai-chat-config-alert">
+                    @Status.Message
+                    <MudButton Href="/admin/ai" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings" Class="ml-2">
+                        Configure
+                    </MudButton>
+                </MudAlert>
+            }
+
+            <div class="ai-chat-messages">
+                @if (Turns.Count == 0)
+                {
+                    <div class="ai-chat-empty">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Size="Size.Large" />
+                        <MudText Typo="Typo.h6">Start a conversation</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Ask a question, draft a plan, or inspect this Aspire starter.</MudText>
+                        <div class="ai-chat-suggestions">
+                            @foreach (var suggestion in Suggestions)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="@(() => UseSuggestion(suggestion))">
+                                    @suggestion
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var turn in Turns)
+                    {
+                        <div class="@GetTurnClass(turn.Role)">
+                            <div class="ai-chat-bubble-meta">
+                                <MudIcon Icon="@GetTurnIcon(turn.Role)" Size="Size.Small" />
+                                <MudText Typo="Typo.caption">@turn.Role</MudText>
+                            </div>
+                            <MudText Typo="Typo.body1">@turn.Message</MudText>
+                        </div>
+                    }
+
+                    @if (IsSending)
+                    {
+                        <div class="ai-chat-turn ai-chat-turn-assistant">
+                            <div class="ai-chat-bubble-meta">
+                                <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                                <MudText Typo="Typo.caption">Thinking</MudText>
+                            </div>
+                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="ai-chat-composer">
+                <MudTextField Label="Message"
+                              Placeholder="Type your prompt..."
+                              Value="@Prompt"
+                              ValueChanged="@((string value) => UpdatePrompt(value))"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="4000"
+                              Immediate="true"
+                              Disabled="IsSending"
+                              OnKeyDown="@((KeyboardEventArgs args) => HandleComposerKeyDown(args))" />
+                <div class="ai-chat-composer-actions">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Ctrl+Enter to send</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Clear" OnClick="ClearConversation" Disabled="IsSending || Turns.Count == 0">
+                        Clear
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Send"
+                               OnClick="SendAsync" Disabled="!CanSend">
+                        Send
+                    </MudButton>
+                </div>
+            </div>
+        </MudPaper>
+    }
+</MudStack>
+
+@code {
+    private AiChatStatusResponse? Status { get; set; }
+    private List<AiChatTurn> Turns { get; } = [];
+    private string Prompt { get; set; } = "Hello! What's your name?";
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+    private bool IsSending { get; set; }
+    private bool CanSend => !IsSending && Status?.IsConfigured == true && !string.IsNullOrWhiteSpace(Prompt.Trim());
+
+    private static readonly string[] Suggestions =
+    [
+        "Summarize what this Aspire starter includes in three bullets.",
+        "Draft a feature plan for adding audit logs.",
+        "Explain how the catalog API and Blazor UI are connected.",
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            Status = await AiChatClient.GetStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (!CanSend)
+        {
+            return;
+        }
+
+        var message = Prompt.Trim();
+        Turns.Add(new AiChatTurn("You", message));
+        Prompt = string.Empty;
+        IsSending = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var response = await AiChatClient.ChatAsync(new AiChatRequest(message));
+            Turns.Add(new AiChatTurn(response.Provider, response.Message));
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsSending = false;
+        }
+    }
+
+    private void UpdatePrompt(string value)
+    {
+        Prompt = value;
+    }
+
+    private async Task HandleComposerKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && args.CtrlKey)
+        {
+            await SendAsync();
+        }
+    }
+
+    private void UseSuggestion(string suggestion)
+    {
+        Prompt = suggestion;
+    }
+
+    private void ClearConversation()
+    {
+        Turns.Clear();
+        ErrorMessage = null;
+    }
+
+    private static string GetTurnClass(string role)
+    {
+        return role == "You" ? "ai-chat-turn ai-chat-turn-user" : "ai-chat-turn ai-chat-turn-assistant";
+    }
+
+    private static string GetTurnIcon(string role)
+    {
+        return role == "You" ? Icons.Material.Filled.Person : Icons.Material.Filled.Psychology;
+    }
+
+    private sealed record AiChatTurn(string Role, string Message);
+}

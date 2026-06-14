@@ -24,6 +24,7 @@ Starting from a blank Aspire template is clean, but the first useful admin app u
 | Admin UI | Dashboard, users, roles, permissions, features, and system configuration |
 | Configuration | Runtime settings stored in the database, including SMTP and account-flow options |
 | Data path | EF Core migrations, API-owned catalog schema, shared DTOs, Blazor CRUD UI |
+| AI integration | Admin-configured AI chat client for ChatGPT, Gemini, GitHub Models, Groq, and Azure Foundry |
 | Developer loop | Local email inbox, pgAdmin, Redis output cache, Aspire dashboard, smoke test |
 
 ## Five-Minute Start
@@ -51,6 +52,7 @@ Useful local URLs:
 | Workspace dashboard | `webfrontend` endpoint + `/` |
 | Admin login | `webfrontend` endpoint + `/admin/login` |
 | Catalog CRUD sample | `webfrontend` endpoint + `/dev/catalog` |
+| AI chat demo | `webfrontend` endpoint + `/ai-chat` |
 | pgAdmin | `pgadmin` endpoint in Aspire Dashboard |
 | smtp4dev inbox | `smtp4dev` endpoint in Aspire Dashboard |
 | Aspire dashboard | Printed by `aspire start` |
@@ -132,6 +134,8 @@ flowchart LR
     Migrations --> Postgres
     Web --> Redis
     Web --> Smtp
+    Web --> Api
+    Web --> AiProviders["AI providers<br/>optional"]
 ```
 
 The application is intentionally split the way a real Aspire app usually grows:
@@ -161,6 +165,7 @@ Included tabs:
 
 System settings are stored in the database and seeded by `Starter.Web/Services/SystemConfigurationService.cs`. They include:
 
+- Current AI provider, provider endpoints, model names, and API keys
 - Self registration
 - Require email confirmation
 - Display development confirmation/reset links
@@ -213,6 +218,18 @@ DELETE /dev/catalog/products/{id}
 ```
 
 Use this slice as the copy-and-rename pattern for the first real module in your app.
+
+## AI Chat
+
+The Demo module includes an optional `/ai-chat` page that uses the current AI API client selected in Admin settings. Open `/admin/ai` to configure:
+
+- `ai.current_provider`: `openai`, `gemini`, `github`, `groq`, or `azure-foundry`
+- `<provider>.endpoint`: OpenAI-compatible Chat Completions endpoint
+- `<provider>.model`: model name for that provider
+- `<provider>.api_key`: secret API key or token
+- `ai.system_prompt`: system prompt sent with each chat request
+
+The default endpoints are seeded for ChatGPT, Gemini, GitHub Models, and Groq. Azure Foundry accepts your Azure OpenAI/Foundry chat completions or responses endpoint and uses the `api-key` header. The app still starts without API keys or model names; `/ai-chat` shows configuration status and disables sending until the selected provider has endpoint, model, and API key configured.
 
 ## Common Commands
 

@@ -4,6 +4,23 @@ namespace Starter.Web.Services;
 
 public static class SystemConfigurationKeys
 {
+    public const string AiCurrentProvider = "ai.current_provider";
+    public const string AiSystemPrompt = "ai.system_prompt";
+    public const string AiOpenAiEndpoint = "ai.openai.endpoint";
+    public const string AiOpenAiModel = "ai.openai.model";
+    public const string AiOpenAiApiKey = "ai.openai.api_key";
+    public const string AiGeminiEndpoint = "ai.gemini.endpoint";
+    public const string AiGeminiModel = "ai.gemini.model";
+    public const string AiGeminiApiKey = "ai.gemini.api_key";
+    public const string AiGitHubEndpoint = "ai.github.endpoint";
+    public const string AiGitHubModel = "ai.github.model";
+    public const string AiGitHubApiKey = "ai.github.api_key";
+    public const string AiGroqEndpoint = "ai.groq.endpoint";
+    public const string AiGroqModel = "ai.groq.model";
+    public const string AiGroqApiKey = "ai.groq.api_key";
+    public const string AiAzureFoundryEndpoint = "ai.azure_foundry.endpoint";
+    public const string AiAzureFoundryModel = "ai.azure_foundry.model";
+    public const string AiAzureFoundryApiKey = "ai.azure_foundry.api_key";
     public const string SelfRegistrationEnabled = "identity.registration.enabled";
     public const string RequireConfirmedEmail = "identity.email_confirmation.required";
     public const string DisplayEmailConfirmationLink = "identity.email_confirmation.display_link";
@@ -45,6 +62,48 @@ public sealed record SystemConfigurationSummary(
     string DefaultValue,
     string ValueType,
     string? Description);
+
+public static class AiApiProviderKeys
+{
+    public const string OpenAi = "openai";
+    public const string Gemini = "gemini";
+    public const string GitHub = "github";
+    public const string Groq = "groq";
+    public const string AzureFoundry = "azure-foundry";
+}
+
+public sealed record AiApiProviderSettings(
+    string Key,
+    string DisplayName,
+    string Endpoint,
+    string Model,
+    string ApiKey)
+{
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(Endpoint)
+        && !string.IsNullOrWhiteSpace(Model)
+        && !string.IsNullOrWhiteSpace(ApiKey);
+}
+
+public sealed record AiApiSettings(
+    string CurrentProvider,
+    string SystemPrompt,
+    IReadOnlyList<AiApiProviderSettings> Providers)
+{
+    public AiApiProviderSettings? CurrentProviderSettings =>
+        Providers.FirstOrDefault(provider => string.Equals(provider.Key, CurrentProvider, StringComparison.OrdinalIgnoreCase));
+}
+
+public sealed record AiApiConfigurationUpdate(
+    string CurrentProvider,
+    string SystemPrompt,
+    IReadOnlyList<AiApiProviderConfigurationUpdate> Providers);
+
+public sealed record AiApiProviderConfigurationUpdate(
+    string Key,
+    string Endpoint,
+    string Model,
+    string ApiKey);
 
 public sealed record SmtpEmailSettings(
     bool DeliveryEnabled,
