@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="Starter.ApiService/Starter.ApiService.csproj" />
   <Project Path="Starter.AppHost/Starter.AppHost.csproj" />
+  <Project Path="Starter.Core/Starter.Core.csproj" Id="69c8169f-6f84-490f-88e4-a7afb2b863a1" />
+  <Project Path="Starter.Experiment/Starter.Experiment.csproj" Id="86c1fe28-82f8-429c-aa1b-7e09090538d8" />
   <Project Path="Starter.MigrationService/Starter.MigrationService.csproj" />
   <Project Path="Starter.ServiceDefaults/Starter.ServiceDefaults.csproj" />
   <Project Path="Starter.Shared/Starter.Shared.csproj" />

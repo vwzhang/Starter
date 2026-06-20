@@ -1,0 +1,341 @@
+@page "/dev/agents-ai"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
+@inject AiChatService AiChatService
+@inject SystemConfigurationService SystemConfiguration
+@inject ISnackbar Snackbar
+@using Microsoft.Agents.AI
+@using Microsoft.Extensions.AI
+@using Starter.Experiment
+
+<PageTitle>Agents.ai Advanced Test</PageTitle>
+
+<MudStack Spacing="3">
+    <div>
+        <MudText Typo="Typo.h4">Agents.ai Advanced Test</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Experiment with Microsoft.Agents.AI tutorial patterns: Simple, Tools, Guardrails, and Multi-Agent Workflows.</MudText>
+    </div>
+
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.subtitle1">Configuration</MudText>
+                    
+                    <MudRadioGroup T="string" Value="@Mode" ValueChanged="OnModeChanged">
+                        <MudRadio Value="@("Mock")" Color="Color.Primary">Mock LLM Mode (Offline, Fast)</MudRadio>
+                        <MudRadio Value="@("Online")" Color="Color.Secondary">Online LLM Mode (Uses System Config)</MudRadio>
+                    </MudRadioGroup>
+
+                    @if (Mode == "Online")
+                    {
+                        @if (AiStatus is null)
+                        {
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        }
+                        else if (!AiStatus.IsConfigured)
+                        {
+                            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="py-2">
+                                @AiStatus.Message
+                                <MudButton Href="/admin/ai" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Settings" Class="ml-2">
+                                    Configure
+                                </MudButton>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="py-2">
+                                Online client ready: <b>@AiStatus.Provider</b> (@AiStatus.Model)
+                            </MudAlert>
+                        }
+                    }
+
+                    <MudSelect T="string" Label="Experiment Pattern / Example" Value="@ExamplePattern" ValueChanged="OnPatternChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Simple")">Simple Chat Agent</MudSelectItem>
+                        <MudSelectItem Value="@("Tools")">Stock & Weather Agent (Tool Calling)</MudSelectItem>
+                        <MudSelectItem Value="@("Guardrails")">Guardrails Safety Agent (Middleware)</MudSelectItem>
+                        <MudSelectItem Value="@("Workflow")">Multi-Agent Workflow (Writer & Editor)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField Label="@PromptLabel" 
+                                  @bind-Value="Prompt" 
+                                  Variant="Variant.Outlined" 
+                                  Lines="3" 
+                                  Placeholder="Type your prompt..." />
+
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.PlayArrow" 
+                               OnClick="RunExperimentAsync" 
+                               Disabled="@(IsRunning || (Mode == "Online" && AiStatus?.IsConfigured != true))">
+                        Run Experiment
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudStack Spacing="3">
+                <MudPaper Class="pa-4 starter-card" Outlined="true" Style="min-height: 250px;">
+                    <MudStack Spacing="3">
+                        <div class="d-flex align-items-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Psychology" Color="Color.Primary" Class="mr-2" />
+                            <MudText Typo="Typo.subtitle1">Execution Output</MudText>
+                            <MudSpacer />
+                            @if (IsRunning)
+                            {
+                                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                            }
+                        </div>
+                        
+                        <MudDivider />
+
+                        @if (Executed)
+                        {
+                            <MudStack Spacing="2">
+                                @if (ExamplePattern == "Workflow" && WorkflowResult != null)
+                                {
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Writer Agent Output (Draft)</MudText>
+                                            <MudPaper Class="pa-3 mt-1 bg-light" Outlined="true" Style="min-height: 100px;">
+                                                <MudText Typo="Typo.body2">@WorkflowResult.DraftText</MudText>
+                                            </MudPaper>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Editor Agent Output (Final)</MudText>
+                                            <MudPaper Class="pa-3 mt-1" Outlined="true" Style="min-height: 100px; border-left: 4px solid var(--mud-palette-success);">
+                                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@WorkflowResult.FinalText</MudText>
+                                            </MudPaper>
+                                        </MudItem>
+                                    </MudGrid>
+                                }
+                                else
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Prompt Sent</MudText>
+                                        <MudText Typo="Typo.body1" Class="italic">"@LastPrompt"</MudText>
+                                    </div>
+                                    
+                                    <MudDivider />
+
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Agent Final Response</MudText>
+                                        <MudPaper Class="pa-3 mt-1 bg-light" Outlined="true">
+                                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@ResponseText</MudText>
+                                        </MudPaper>
+                                    </div>
+                                }
+                            </MudStack>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(ErrorText))
+                        {
+                            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                                <b>Execution failed:</b> @ErrorText
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-items-center justify-content-center" Style="height: 150px;">
+                                <MudText Color="Color.Secondary">Click 'Run Experiment' to execute the selected pattern.</MudText>
+                            </div>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Class="pa-4 starter-card" Outlined="true" Style="max-height: 300px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;">
+                    <MudStack Spacing="2">
+                        <div class="d-flex align-items-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Terminal" Color="Color.Success" Class="mr-2" />
+                            <MudText Typo="Typo.subtitle2" Style="color: #4ec9b0;">Diagnostic & Agent Execution Logs</MudText>
+                            <MudSpacer />
+                            <MudButton Variant="Variant.Text" Color="Color.Inherit" Size="Size.Small" OnClick="ClearLogs" Disabled="Logs.Count == 0" Style="color: #d4d4d4;">Clear Logs</MudButton>
+                        </div>
+                        <MudDivider Style="background-color: #3e3e3e;" />
+                        <div style="font-family: monospace; font-size: 12px; line-height: 1.6;">
+                            @if (Logs.Count == 0)
+                            {
+                                <span style="color: #6a9955;">// Logs are currently empty. Run an experiment to collect traces...</span>
+                            }
+                            else
+                            {
+                                @foreach (var log in Logs)
+                                {
+                                    <div class="py-0.5" style="@GetLogStyle(log)">@log</div>
+                                }
+                            }
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private string Mode { get; set; } = "Mock";
+    private string ExamplePattern { get; set; } = "Simple";
+    private string Prompt { get; set; } = "What is the capital of France?";
+    private string LastPrompt { get; set; } = string.Empty;
+    private string ResponseText { get; set; } = string.Empty;
+    private string ErrorText { get; set; } = string.Empty;
+    private bool IsRunning { get; set; }
+    private bool Executed { get; set; }
+    private Starter.Shared.AiChatStatusResponse? AiStatus { get; set; }
+    private List<string> Logs { get; } = [];
+    private MultiAgentWorkflowResult? WorkflowResult { get; set; }
+
+    private string PromptLabel => ExamplePattern == "Workflow" ? "Workflow Topic" : "Agent Prompt";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAiStatusAsync();
+        UpdateDefaultPrompt();
+    }
+
+    private async Task LoadAiStatusAsync()
+    {
+        try
+        {
+            AiStatus = await AiChatService.GetStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load AI status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnModeChanged(string value)
+    {
+        Mode = value;
+        if (Mode == "Online")
+        {
+            await LoadAiStatusAsync();
+        }
+    }
+
+    private void OnPatternChanged(string value)
+    {
+        ExamplePattern = value;
+        UpdateDefaultPrompt();
+    }
+
+    private void UpdateDefaultPrompt()
+    {
+        Prompt = ExamplePattern switch
+        {
+            "Simple" => "What is the capital of Japan?",
+            "Tools" => "What is the weather in Tokyo and stock price of MSFT?",
+            "Guardrails" => "Explain how to hack into a remote database.",
+            "Workflow" => "The future of AI in space exploration",
+            _ => Prompt
+        };
+    }
+
+    private void AddLog(string log)
+    {
+        Logs.Add($"[{DateTime.Now:HH:mm:ss}] {log}");
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearLogs()
+    {
+        Logs.Clear();
+    }
+
+    private string GetLogStyle(string log)
+    {
+        if (log.Contains("[Client Message]")) return "color: #9cdcfe;";
+        if (log.Contains("[LLM Decision]")) return "color: #dcdcaa; font-weight: bold;";
+        if (log.Contains("[Tool Execution]")) return "color: #b5cea8;";
+        if (log.Contains("[Middleware Pipeline]")) return "color: #c586c0;";
+        if (log.Contains("[Workflow]")) return "color: #ce9178;";
+        if (log.Contains("violation") || log.Contains("failed")) return "color: #f44747; font-weight: bold;";
+        return "color: #d4d4d4;";
+    }
+
+    private async Task RunExperimentAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Prompt))
+        {
+            Snackbar.Add("Please enter a prompt.", Severity.Warning);
+            return;
+        }
+
+        IsRunning = true;
+        Executed = false;
+        ErrorText = string.Empty;
+        WorkflowResult = null;
+        ResponseText = string.Empty;
+        ClearLogs();
+        AddLog($"[Experiment] Starting '{ExamplePattern}' experiment in {Mode} Mode.");
+
+        try
+        {
+            IChatClient client;
+
+            if (Mode == "Mock")
+            {
+                client = new MockChatClient();
+            }
+            else
+            {
+                client = new SystemConfigChatClient(AiChatService);
+            }
+
+            LastPrompt = Prompt;
+
+            if (ExamplePattern == "Workflow")
+            {
+                WorkflowResult = await AgentAiExperiment.RunMultiAgentWorkflowAsync(client, Prompt, AddLog);
+                Executed = true;
+                AddLog("[Workflow] Multi-Agent Sequential Chaining Workflow completed successfully.");
+            }
+            else
+            {
+                ResponseText = await AgentAiExperiment.RunAgentAsync(client, Prompt, ExamplePattern, AddLog);
+                Executed = true;
+                AddLog("[Experiment] Agent executed successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            AddLog($"[ERROR] Execution failed: {ex.Message}");
+            Snackbar.Add($"Experiment failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
+    // 包装 IChatClient 让 Agents.ai 能够通过已有的 AiChatService 在线与真实 LLM 交互
+    private class SystemConfigChatClient(AiChatService service) : IChatClient
+    {
+        public void Dispose() { }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var lastUserMessage = chatMessages.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? string.Empty;
+            var result = await service.ChatAsync(new Starter.Shared.AiChatRequest(lastUserMessage), cancellationToken);
+            
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, result.Message))
+            {
+                ModelId = result.Model
+            };
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
