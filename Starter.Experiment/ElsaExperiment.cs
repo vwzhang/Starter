@@ -1,4 +1,5 @@
 using Elsa.Extensions;
+using Elsa.Expressions.Models;
 using Elsa.Workflows;
 using Elsa.Workflows.Activities;
 using Elsa.Workflows.Memory;
@@ -48,6 +49,53 @@ namespace Starter.Experiment
         public string Value { get; set; } = string.Empty;
     }
 
+    public class WorkflowDiagnostics
+    {
+        private readonly List<LoopIterationResult> _loopIterations = new();
+        private readonly List<ConditionDecision> _conditionDecisions = new();
+        private readonly object _lock = new();
+
+        public int NextLoopIteration()
+        {
+            lock (_lock)
+            {
+                return _loopIterations.Count + 1;
+            }
+        }
+
+        public void AddLoopIteration(LoopIterationResult result)
+        {
+            lock (_lock)
+            {
+                _loopIterations.Add(result);
+            }
+        }
+
+        public void AddConditionDecision(ConditionDecision decision)
+        {
+            lock (_lock)
+            {
+                _conditionDecisions.Add(decision);
+            }
+        }
+
+        public IReadOnlyList<LoopIterationResult> GetLoopIterations()
+        {
+            lock (_lock)
+            {
+                return _loopIterations.ToList();
+            }
+        }
+
+        public IReadOnlyList<ConditionDecision> GetConditionDecisions()
+        {
+            lock (_lock)
+            {
+                return _conditionDecisions.ToList();
+            }
+        }
+    }
+
     // 1. Custom Activity: Initialize Order
     public class InitializeOrderActivity : CodeActivity
     {
@@ -83,24 +131,32 @@ namespace Starter.Experiment
         protected override void Execute(ActivityExecutionContext context)
         {
             var logger = context.GetRequiredService<WorkflowLogger>();
+            var diagnostics = context.GetRequiredService<WorkflowDiagnostics>();
             var item = context.GetVariable<string>("CurrentItem");
             var status = context.GetVariable<string>("OrderStatus");
+            var iteration = diagnostics.NextLoopIteration();
 
-            // If already rejected, skip
-            if (status == "Rejected") return;
+            if (status == "Rejected")
+            {
+                logger.Log($"[ProcessItemActivity] Loop iteration {iteration}: skipping item '{item}' because OrderStatus is already Rejected.");
+                diagnostics.AddLoopIteration(new LoopIterationResult(iteration, item ?? string.Empty, "Skipped", status));
+                return;
+            }
 
-            logger.Log($"[ProcessItemActivity] Checking inventory for item: '{item}'...");
+            logger.Log($"[ProcessItemActivity] Loop iteration {iteration}: checking inventory for item '{item}'...");
 
             var keywords = context.Get(OutOfStockKeywords) ?? new List<string> { "out-of-stock", "sold-out" };
 
             if (item != null && keywords.Any(kw => item.Contains(kw, StringComparison.OrdinalIgnoreCase)))
             {
-                logger.Log($"[ProcessItemActivity] Item '{item}' is OUT OF STOCK. Rejecting order.");
+                logger.Log($"[ProcessItemActivity] Loop iteration {iteration}: Item '{item}' is OUT OF STOCK. Rejecting order.");
                 context.SetVariable("OrderStatus", "Rejected");
+                diagnostics.AddLoopIteration(new LoopIterationResult(iteration, item, "OutOfStock", "Rejected"));
             }
             else
             {
-                logger.Log($"[ProcessItemActivity] Item '{item}' is in stock.");
+                logger.Log($"[ProcessItemActivity] Loop iteration {iteration}: item '{item}' is in stock.");
+                diagnostics.AddLoopIteration(new LoopIterationResult(iteration, item ?? string.Empty, "InStock", "Pending"));
             }
         }
     }
@@ -113,12 +169,22 @@ namespace Starter.Experiment
         protected override void Execute(ActivityExecutionContext context)
         {
             var logger = context.GetRequiredService<WorkflowLogger>();
+            var diagnostics = context.GetRequiredService<WorkflowDiagnostics>();
             
             var amount = context.WorkflowInput.TryGetValue("OrderAmount", out var amountObj) ? Convert.ToDouble(amountObj) : 0.0;
             var vip = context.WorkflowInput.TryGetValue("CustomerVIP", out var vipObj) ? Convert.ToBoolean(vipObj) : false;
             var status = context.GetVariable<string>("OrderStatus");
 
-            if (status == "Rejected") return;
+            if (status == "Rejected")
+            {
+                logger.Log("[EvaluateApprovalActivity] Condition skipped because OrderStatus is Rejected.");
+                diagnostics.AddConditionDecision(new ConditionDecision(
+                    "Approval gate",
+                    "OrderStatus != Rejected",
+                    false,
+                    "Skipped approval evaluation"));
+                return;
+            }
 
             var threshold = context.Get(ApprovalThreshold);
 
@@ -130,17 +196,32 @@ namespace Starter.Experiment
                 {
                     logger.Log($"[EvaluateApprovalActivity] Order amount > ${threshold:F2}, but customer is VIP. Auto-approving order.");
                     context.SetVariable("OrderStatus", "Approved");
+                    diagnostics.AddConditionDecision(new ConditionDecision(
+                        "High value VIP branch",
+                        $"OrderAmount > {threshold:F2} && CustomerVIP",
+                        true,
+                        "Approved"));
                 }
                 else
                 {
                     logger.Log($"[EvaluateApprovalActivity] Order amount > ${threshold:F2} and customer is NOT VIP. Escaped to Manual Review.");
                     context.SetVariable("OrderStatus", "ManualReview");
+                    diagnostics.AddConditionDecision(new ConditionDecision(
+                        "Manual review branch",
+                        $"OrderAmount > {threshold:F2} && !CustomerVIP",
+                        true,
+                        "ManualReview"));
                 }
             }
             else
             {
                 logger.Log($"[EvaluateApprovalActivity] Order amount is under ${threshold:F2}. Auto-approving order.");
                 context.SetVariable("OrderStatus", "Approved");
+                diagnostics.AddConditionDecision(new ConditionDecision(
+                    "Auto approval branch",
+                    $"OrderAmount <= {threshold:F2}",
+                    true,
+                    "Approved"));
             }
         }
     }
@@ -151,6 +232,7 @@ namespace Starter.Experiment
         protected override void Execute(ActivityExecutionContext context)
         {
             var logger = context.GetRequiredService<WorkflowLogger>();
+            var diagnostics = context.GetRequiredService<WorkflowDiagnostics>();
             var status = context.GetVariable<string>("OrderStatus");
 
             if (status == "Approved")
@@ -158,10 +240,20 @@ namespace Starter.Experiment
                 var amount = context.WorkflowInput.TryGetValue("OrderAmount", out var amountObj) ? Convert.ToDouble(amountObj) : 0.0;
                 logger.Log($"[ProcessPaymentActivity] Authorizing gateway charge of ${amount:F2}...");
                 logger.Log($"[ProcessPaymentActivity] Gateway approved transaction. ID: txn_{Guid.NewGuid().ToString()[..8].ToUpperInvariant()}");
+                diagnostics.AddConditionDecision(new ConditionDecision(
+                    "Payment condition",
+                    "OrderStatus == Approved",
+                    true,
+                    "Payment processed"));
             }
             else
             {
                 logger.Log($"[ProcessPaymentActivity] Order status is '{status}'. Skipping payment processing.");
+                diagnostics.AddConditionDecision(new ConditionDecision(
+                    "Payment condition",
+                    "OrderStatus == Approved",
+                    false,
+                    "Payment skipped"));
             }
         }
     }
@@ -192,8 +284,10 @@ namespace Starter.Experiment
 
             var tracker = new ResultTracker();
             var logger = new WorkflowLogger();
+            var diagnostics = new WorkflowDiagnostics();
             services.AddSingleton(tracker);
             services.AddSingleton(logger);
+            services.AddSingleton(diagnostics);
 
             var serviceProvider = services.BuildServiceProvider();
             var workflowRunner = serviceProvider.GetRequiredService<IWorkflowRunner>();
@@ -235,8 +329,10 @@ namespace Starter.Experiment
 
             var tracker = new ResultTracker();
             var logger = new WorkflowLogger();
+            var diagnostics = new WorkflowDiagnostics();
             services.AddSingleton(tracker);
             services.AddSingleton(logger);
+            services.AddSingleton(diagnostics);
 
             var serviceProvider = services.BuildServiceProvider();
             var workflowRunner = serviceProvider.GetRequiredService<IWorkflowRunner>();
@@ -288,7 +384,13 @@ namespace Starter.Experiment
 
             if (innerActivities.Any())
             {
-                thenActivities.Add(new If(context => context.GetVariable<string>("OrderStatus") != "Rejected")
+                thenActivities.Add(new If(context => RecordCondition(
+                    context,
+                    "Continue after inventory loop",
+                    "OrderStatus != Rejected",
+                    context.GetVariable<string>("OrderStatus") != "Rejected",
+                    "Run approval and payment branch",
+                    "Skip approval and payment branch"))
                 {
                     Then = new Sequence { Activities = innerActivities }
                 });
@@ -296,7 +398,13 @@ namespace Starter.Experiment
 
             if (thenActivities.Any())
             {
-                activities.Add(new If(context => context.GetVariable<string>("OrderStatus") != "Rejected")
+                activities.Add(new If(context => RecordCondition(
+                    context,
+                    "Continue after initialization",
+                    "OrderStatus != Rejected",
+                    context.GetVariable<string>("OrderStatus") != "Rejected",
+                    "Run inventory loop and approval gates",
+                    "Skip inventory loop and approval gates"))
                 {
                     Then = new Sequence { Activities = thenActivities }
                 });
@@ -363,7 +471,29 @@ namespace Starter.Experiment
                 }
             }
 
-            return new OrderWorkflowResult(tracker.Value, logger.GetLogs());
+            return new OrderWorkflowResult(
+                tracker.Value,
+                logger.GetLogs(),
+                diagnostics.GetLoopIterations(),
+                diagnostics.GetConditionDecisions());
+        }
+
+        private static bool RecordCondition(
+            ExpressionExecutionContext context,
+            string name,
+            string expression,
+            bool result,
+            string trueOutcome,
+            string falseOutcome)
+        {
+            var logger = context.GetRequiredService<WorkflowLogger>();
+            var diagnostics = context.GetRequiredService<WorkflowDiagnostics>();
+            var outcome = result ? trueOutcome : falseOutcome;
+
+            logger.Log($"[Condition] {name}: {expression} => {result}. Outcome: {outcome}.");
+            diagnostics.AddConditionDecision(new ConditionDecision(name, expression, result, outcome));
+
+            return result;
         }
     }
 
@@ -382,7 +512,23 @@ namespace Starter.Experiment
         public string CustomLogMessage { get; set; } = "Custom write line log";
     }
 
-    public sealed record OrderWorkflowResult(string FinalValue, IReadOnlyList<string> Logs);
+    public sealed record LoopIterationResult(
+        int Iteration,
+        string Item,
+        string Outcome,
+        string OrderStatusAfterIteration);
+
+    public sealed record ConditionDecision(
+        string Name,
+        string Expression,
+        bool Result,
+        string Outcome);
+
+    public sealed record OrderWorkflowResult(
+        string FinalValue,
+        IReadOnlyList<string> Logs,
+        IReadOnlyList<LoopIterationResult> LoopIterations,
+        IReadOnlyList<ConditionDecision> ConditionDecisions);
 
     public class TrackResultActivity : CodeActivity
     {

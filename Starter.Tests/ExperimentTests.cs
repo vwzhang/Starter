@@ -50,6 +50,10 @@ public class ExperimentTests
             Console.WriteLine(log);
         }
         Assert.Contains("Approved", result.FinalValue);
+        Assert.Equal(2, result.LoopIterations.Count);
+        Assert.All(result.LoopIterations, iteration => Assert.Equal("InStock", iteration.Outcome));
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Auto approval branch" && decision.Outcome == "Approved");
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Payment condition" && decision.Result);
         Assert.Contains(result.Logs, l => l.Contains("[ProcessPaymentActivity] Authorizing gateway charge"));
         Assert.Contains(result.Logs, l => l.Contains("[FinalizeOrderActivity] Final Order Status: Approved"));
     }
@@ -70,6 +74,8 @@ public class ExperimentTests
             Console.WriteLine(log);
         }
         Assert.Contains("Rejected", result.FinalValue);
+        Assert.Contains(result.LoopIterations, iteration => iteration.Item == "iphone [out-of-stock]" && iteration.Outcome == "OutOfStock");
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Continue after inventory loop" && !decision.Result);
         Assert.Contains(result.Logs, l => l.Contains("Item 'iphone [out-of-stock]' is OUT OF STOCK"));
         Assert.Contains(result.Logs, l => l.Contains("[FinalizeOrderActivity] Final Order Status: Rejected"));
     }
@@ -90,9 +96,33 @@ public class ExperimentTests
             Console.WriteLine(log);
         }
         Assert.Contains("ManualReview", result.FinalValue);
+        Assert.Single(result.LoopIterations);
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Manual review branch" && decision.Outcome == "ManualReview");
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Payment condition" && !decision.Result);
         Assert.Contains(result.Logs, l => l.Contains("customer is NOT VIP. Escaped to Manual Review."));
         Assert.Contains(result.Logs, l => l.Contains("Skipping payment processing"));
         Assert.Contains(result.Logs, l => l.Contains("[FinalizeOrderActivity] Final Order Status: ManualReview"));
+    }
+
+    [Fact]
+    public async Task Elsa_OrderWorkflow_OutOfStock_SkipsRemainingLoopItems()
+    {
+        // Arrange
+        var items = new List<string> { "laptop", "iphone [out-of-stock]", "mouse" };
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await ElsaExperiment.RunOrderWorkflowAsync(450.00, false, items, cancellationToken);
+
+        // Assert
+        Assert.Contains("Rejected", result.FinalValue);
+        Assert.Equal(3, result.LoopIterations.Count);
+        Assert.Collection(
+            result.LoopIterations,
+            iteration => Assert.Equal("InStock", iteration.Outcome),
+            iteration => Assert.Equal("OutOfStock", iteration.Outcome),
+            iteration => Assert.Equal("Skipped", iteration.Outcome));
+        Assert.Contains(result.ConditionDecisions, decision => decision.Name == "Continue after inventory loop" && !decision.Result);
     }
 
     [Fact]

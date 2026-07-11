@@ -141,6 +141,85 @@
                 </MudItem>
             </MudGrid>
 
+            @if (Executed)
+            {
+                <MudGrid Class="mt-4" Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4 starter-card" Outlined="true">
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Repeat" Color="Color.Primary" />
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Loop Iterations</MudText>
+                                    <MudSpacer />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                        @LoopIterations.Count iteration(s)
+                                    </MudChip>
+                                </MudStack>
+                                <MudTable Items="LoopIterations" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>#</MudTh>
+                                        <MudTh>Item</MudTh>
+                                        <MudTh>Outcome</MudTh>
+                                        <MudTh>Status</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="iteration">
+                                        <MudTd DataLabel="#">@iteration.Iteration</MudTd>
+                                        <MudTd DataLabel="Item">@iteration.Item</MudTd>
+                                        <MudTd DataLabel="Outcome">
+                                            <MudChip T="string" Size="Size.Small" Color="@GetLoopOutcomeColor(iteration.Outcome)" Variant="Variant.Outlined">
+                                                @iteration.Outcome
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Status">@iteration.OrderStatusAfterIteration</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No loop iterations ran.</MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4 starter-card" Outlined="true">
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Rule" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Condition Decisions</MudText>
+                                    <MudSpacer />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @ConditionDecisions.Count decision(s)
+                                    </MudChip>
+                                </MudStack>
+                                <MudTable Items="ConditionDecisions" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Expression</MudTh>
+                                        <MudTh>Result</MudTh>
+                                        <MudTh>Outcome</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="decision">
+                                        <MudTd DataLabel="Name">@decision.Name</MudTd>
+                                        <MudTd DataLabel="Expression">
+                                            <code style="font-size: 11px;">@decision.Expression</code>
+                                        </MudTd>
+                                        <MudTd DataLabel="Result">
+                                            <MudChip T="string" Size="Size.Small" Color="@(decision.Result ? Color.Success : Color.Warning)" Variant="Variant.Outlined">
+                                                @decision.Result
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Outcome">@decision.Outcome</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No conditional branches were evaluated.</MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+
             <!-- Execution Logs (Terminal UI) -->
             <MudPaper Class="pa-4 mt-4 bg-dark text-light" Outlined="true" Style="background-color: #1e1e1e; font-family: Consolas, monospace; min-height: 180px;">
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-white-50">Studio Execution Console Output Logs</MudText>
@@ -274,6 +353,8 @@
     
     private string OutputResult { get; set; } = string.Empty;
     private List<string> WorkflowLogs { get; set; } = new();
+    private List<LoopIterationResult> LoopIterations { get; set; } = new();
+    private List<ConditionDecision> ConditionDecisions { get; set; } = new();
     
     private bool IsRunning { get; set; }
     private bool Executed { get; set; }
@@ -341,6 +422,8 @@
         IsRunning = true;
         Executed = false;
         WorkflowLogs.Clear();
+        LoopIterations.Clear();
+        ConditionDecisions.Clear();
         ResetNodeStates();
         StateHasChanged();
 
@@ -357,6 +440,8 @@
             
             OutputResult = result.FinalValue;
             WorkflowLogs = result.Logs.ToList();
+            LoopIterations = result.LoopIterations.ToList();
+            ConditionDecisions = result.ConditionDecisions.ToList();
             Executed = true;
             
             // Analyze real logs to update live viewer node statuses
@@ -466,10 +551,10 @@
                 $"Input Variables:\n- OrderAmount: {OrderAmount:C2}\n- CustomerVIP: {CustomerVIP}\n- Items: {ItemsString}\n\nOutputs:\n- Set Variable 'OrderStatus' = 'Pending'\n\nBehavior:\n- Validates item counts; rejects immediately if empty.",
             
             "Inventory Check (Loop)" => 
-                $"Input Variables:\n- Items: {ItemsString}\n\nNode Properties:\n- Keywords Check: {OutOfStockKeywordsString}\n\nBehavior:\n- Loops through elements; changes 'OrderStatus' to 'Rejected' if an item matches keywords.",
+                $"Input Variables:\n- Items: {ItemsString}\n\nNode Properties:\n- Keywords Check: {OutOfStockKeywordsString}\n\nLast Run:\n- Iterations: {LoopIterations.Count}\n- Outcomes: {string.Join(", ", LoopIterations.Select(item => $"{item.Item}={item.Outcome}"))}\n\nBehavior:\n- Loops through elements; changes 'OrderStatus' to 'Rejected' if an item matches keywords.",
             
             "Evaluate Approval" => 
-                $"Input Variables:\n- OrderAmount: {OrderAmount:C2}\n- CustomerVIP: {CustomerVIP}\n\nNode Properties:\n- Threshold Limit: {Schema.ApprovalThreshold:C2}\n\nBehavior:\n- Approves automatically if below threshold. Requires VIP to auto-approve above threshold, otherwise escalates status to 'ManualReview'.",
+                $"Input Variables:\n- OrderAmount: {OrderAmount:C2}\n- CustomerVIP: {CustomerVIP}\n\nNode Properties:\n- Threshold Limit: {Schema.ApprovalThreshold:C2}\n\nLast Run:\n- Branches: {string.Join(", ", ConditionDecisions.Where(item => item.Name.Contains("branch", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("approval", StringComparison.OrdinalIgnoreCase)).Select(item => $"{item.Name} => {item.Outcome}"))}\n\nBehavior:\n- Approves automatically if below threshold. Requires VIP to auto-approve above threshold, otherwise escalates status to 'ManualReview'.",
             
             "Process Payment" => 
                 $"Input Variables:\n- OrderStatus: (dynamic)\n- OrderAmount: {OrderAmount:C2}\n\nBehavior:\n- Executes payment charge if 'OrderStatus' is 'Approved'; skips otherwise.",
@@ -524,6 +609,17 @@
             "Skipped" => Color.Warning,
             "Disabled" => Color.Default,
             _ => Color.Primary
+        };
+    }
+
+    private Color GetLoopOutcomeColor(string outcome)
+    {
+        return outcome switch
+        {
+            "InStock" => Color.Success,
+            "OutOfStock" => Color.Error,
+            "Skipped" => Color.Warning,
+            _ => Color.Default
         };
     }
 

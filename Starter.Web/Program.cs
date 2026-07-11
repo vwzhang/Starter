@@ -42,6 +42,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.Configure<IdentitySeedOptions>(builder.Configuration.GetSection("Identity:Seed"));
 builder.Services.AddScoped<AdminIdentityService>();
 builder.Services.AddScoped<SystemConfigurationService>();
+builder.Services.AddScoped<AgentConversationStore>();
 builder.Services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
@@ -77,6 +78,7 @@ builder.Services.AddHttpClient<CatalogApiClient>(client =>
     });
 builder.Services.AddHttpClient<AiChatService>();
 builder.Services.AddHttpClient<AiModelCatalogService>();
+builder.Services.AddHttpClient<AgentToolService>();
 
 var app = builder.Build();
 
