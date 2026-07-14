@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using Starter.Shared;
 
 namespace Starter.Tests;
@@ -15,6 +16,7 @@ public class WebTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Starter_AppHost>(cancellationToken);
+        appHost.Configuration["Parameters:pgadmin-password"] = "TestOnly-PgAdmin-Password-1!";
         appHost.Services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Debug);
@@ -96,16 +98,30 @@ public class WebTests
         Assert.Equal(HttpStatusCode.NoContent, deleteCategoryResponse.StatusCode);
 
         // Act + Assert: forgot-password uses the seeded SMTP settings and is captured by smtp4dev.
+        var forgotPasswordPage = await httpClient.GetStringAsync("/account/forgot-password", cancellationToken);
+        var antiforgeryToken = GetAntiforgeryToken(forgotPasswordPage);
         var forgotResponse = await httpClient.PostAsync(
             "/account/forgot-password",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["Email"] = "admin@starter.local",
+                ["__RequestVerificationToken"] = antiforgeryToken,
             }),
             cancellationToken);
         Assert.True(forgotResponse.IsSuccessStatusCode || forgotResponse.StatusCode == HttpStatusCode.Redirect);
 
         await WaitForSmtpMessageAsync(smtpClient, "Reset your Starter password", cancellationToken);
+    }
+
+    private static string GetAntiforgeryToken(string html)
+    {
+        var match = Regex.Match(
+            html,
+            "<input[^>]*name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        Assert.True(match.Success, "The forgot-password form did not render an antiforgery token.");
+        return System.Net.WebUtility.HtmlDecode(match.Groups[1].Value);
     }
 
     private static async Task WaitForSmtpMessageAsync(

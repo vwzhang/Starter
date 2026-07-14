@@ -11,18 +11,17 @@ public static class AccountIdentityEndpoints
     {
         endpoints.MapPost("/account/register", RegisterAsync)
             .AllowAnonymous()
-            .DisableAntiforgery();
+            .RequireRateLimiting("account");
 
         endpoints.MapGet("/account/confirm-email", ConfirmEmailAsync)
             .AllowAnonymous();
 
         endpoints.MapPost("/account/forgot-password", ForgotPasswordAsync)
             .AllowAnonymous()
-            .DisableAntiforgery();
+            .RequireRateLimiting("account");
 
         endpoints.MapPost("/account/reset-password", ResetPasswordAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
+            .AllowAnonymous();
 
         return endpoints;
     }
@@ -91,7 +90,7 @@ public static class AccountIdentityEndpoints
                 email);
 
             var logger = loggerFactory.CreateLogger("AccountIdentity");
-            logger.LogInformation("Generated email confirmation link for {Email}: {ConfirmationLink}", email, confirmationLink);
+            logger.LogInformation("Generated email confirmation link for account {UserId}.", user.Id);
 
             var emailResult = await emailSender.SendEmailConfirmationAsync(
                 email,
@@ -181,7 +180,7 @@ public static class AccountIdentityEndpoints
 
         loggerFactory
             .CreateLogger("AccountIdentity")
-            .LogInformation("Generated password reset link for {Email}: {ResetLink}", email, resetLink);
+            .LogInformation("Generated password reset link for account {UserId}.", user.Id);
 
         var emailResult = await emailSender.SendPasswordResetAsync(email, resetLink, httpContext.RequestAborted);
         var logger = loggerFactory.CreateLogger("AccountIdentity");

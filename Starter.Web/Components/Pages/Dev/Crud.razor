@@ -1,5 +1,6 @@
 @page "/dev/catalog"
 @page "/dev/crud"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
 @inject CatalogApiClient CatalogApi
 @inject ISnackbar Snackbar
 

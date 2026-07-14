@@ -223,13 +223,21 @@ Use this slice as the copy-and-rename pattern for the first real module in your 
 
 The Demo module includes an optional `/ai-chat` page that uses the current AI API client selected in Admin settings. Open `/admin/ai` to configure:
 
-- `ai.current_provider`: `openai`, `gemini`, `github`, `groq`, or `azure-foundry`
+- `ai.current_provider`: `openai`, `deepseek`, `gemini`, `github`, `groq`, or `azure-foundry`
 - `<provider>.endpoint`: OpenAI-compatible Chat Completions endpoint
 - `<provider>.model`: model name for that provider
 - `<provider>.api_key`: secret API key or token
 - `ai.system_prompt`: system prompt sent with each chat request
 
-The default endpoints are seeded for ChatGPT, Gemini, GitHub Models, and Groq. Azure Foundry accepts your Azure OpenAI/Foundry chat completions or responses endpoint and uses the `api-key` header. The app still starts without API keys or model names; `/ai-chat` shows configuration status and disables sending until the selected provider has endpoint, model, and API key configured.
+The default endpoints are seeded for ChatGPT, DeepSeek, Gemini, GitHub Models, and Groq. Azure Foundry accepts your Azure OpenAI/Foundry chat completions or responses endpoint and uses the `api-key` header. The app still starts without API keys or model names; `/ai-chat` shows configuration status and disables sending until the selected provider has endpoint, model, and API key configured.
+
+For local development, keep the OpenAI key out of the database and source tree by using .NET User Secrets. The `Starter.Web` project reads `AI:OpenAI:ApiKey`, which overrides the value configured in Admin settings:
+
+```powershell
+dotnet user-secrets set "AI:OpenAI:ApiKey" "your-api-key" --project Starter.Web
+```
+
+The same pattern is available for the built-in providers: `AI:DeepSeek:ApiKey`, `AI:Gemini:ApiKey`, `AI:GitHub:ApiKey`, `AI:Groq:ApiKey`, and `AI:AzureFoundry:ApiKey`.
 
 ## Common Commands
 

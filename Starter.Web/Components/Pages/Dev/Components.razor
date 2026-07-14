@@ -1,5 +1,6 @@
 @page "/dev/components"
 @page "/dev/dashboard"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
 
 <PageTitle>Dev Dashboard</PageTitle>
 

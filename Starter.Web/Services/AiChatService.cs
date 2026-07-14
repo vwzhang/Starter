@@ -11,10 +11,15 @@ public sealed class AiChatService(
     SystemConfigurationService systemConfiguration,
     ILogger<AiChatService> logger)
 {
-    public async Task<AiChatStatusResponse> GetStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<AiChatStatusResponse> GetStatusAsync(
+        string? providerKey = null,
+        CancellationToken cancellationToken = default)
     {
         var settings = await systemConfiguration.GetAiApiSettingsAsync();
-        var provider = settings.CurrentProviderSettings;
+        var selectedProviderKey = string.IsNullOrWhiteSpace(providerKey)
+            ? settings.CurrentProvider
+            : providerKey.Trim();
+        var provider = GetProvider(settings, selectedProviderKey);
 
         if (provider is null)
         {
@@ -23,7 +28,7 @@ public sealed class AiChatService(
                 null,
                 null,
                 null,
-                $"Unknown AI provider '{settings.CurrentProvider}'. Select ChatGPT, Gemini, GitHub Models, Groq, or Azure Foundry in Admin settings.");
+                $"Unknown AI provider '{selectedProviderKey}'. Select ChatGPT, DeepSeek, Gemini, GitHub Models, Groq, or Azure Foundry in Admin settings.");
         }
 
         return new AiChatStatusResponse(
@@ -46,8 +51,8 @@ public sealed class AiChatService(
         }
 
         var settings = await systemConfiguration.GetAiApiSettingsAsync();
-        var provider = settings.CurrentProviderSettings
-            ?? throw new InvalidOperationException($"Unknown AI provider '{settings.CurrentProvider}'.");
+        var provider = GetProvider(settings, request.ProviderKey ?? settings.CurrentProvider)
+            ?? throw new InvalidOperationException($"Unknown AI provider '{request.ProviderKey ?? settings.CurrentProvider}'.");
 
         if (!provider.IsConfigured)
         {
@@ -62,40 +67,12 @@ public sealed class AiChatService(
             ? JsonContent.Create(new
             {
                 model = provider.Model,
-                input = new object[]
-                {
-                    new
-                    {
-                        role = "system",
-                        content = string.IsNullOrWhiteSpace(settings.SystemPrompt)
-                            ? "You are a helpful assistant."
-                            : settings.SystemPrompt,
-                    },
-                    new
-                    {
-                        role = "user",
-                        content = request.Message.Trim(),
-                    },
-                },
+                input = ToChatMessages(request, settings.SystemPrompt),
             })
             : JsonContent.Create(new
         {
             model = provider.Model,
-            messages = new[]
-            {
-                new
-                {
-                    role = "system",
-                    content = string.IsNullOrWhiteSpace(settings.SystemPrompt)
-                        ? "You are a helpful assistant."
-                        : settings.SystemPrompt,
-                },
-                new
-                {
-                    role = "user",
-                    content = request.Message.Trim(),
-                },
-            },
+            messages = ToChatMessages(request, settings.SystemPrompt),
         });
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
@@ -231,6 +208,56 @@ public sealed class AiChatService(
         {
             return null;
         }
+    }
+
+    private static List<object> ToChatMessages(AiChatRequest request, string systemPrompt)
+    {
+        var messages = new List<object>
+        {
+            new
+            {
+                role = "system",
+                content = string.IsNullOrWhiteSpace(systemPrompt)
+                    ? "You are a helpful assistant."
+                    : systemPrompt,
+            },
+        };
+
+        var conversation = request.Conversation?
+            .Where(message => !string.IsNullOrWhiteSpace(message.Message)
+                && (string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)))
+            .TakeLast(20)
+            .ToList()
+            ?? [];
+
+        foreach (var message in conversation)
+        {
+            messages.Add(new
+            {
+                role = message.Role.Trim().ToLowerInvariant(),
+                content = message.Message.Trim(),
+            });
+        }
+
+        if (conversation.Count == 0
+            || !string.Equals(conversation[^1].Role, "user", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(conversation[^1].Message.Trim(), request.Message.Trim(), StringComparison.Ordinal))
+        {
+            messages.Add(new
+            {
+                role = "user",
+                content = request.Message.Trim(),
+            });
+        }
+
+        return messages;
+    }
+
+    private static AiApiProviderSettings? GetProvider(AiApiSettings settings, string providerKey)
+    {
+        return settings.Providers.FirstOrDefault(provider =>
+            string.Equals(provider.Key, providerKey, StringComparison.OrdinalIgnoreCase));
     }
 
     private static List<Dictionary<string, object?>> ToOpenAiMessages(

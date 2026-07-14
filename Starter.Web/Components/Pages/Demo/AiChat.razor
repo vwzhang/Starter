@@ -1,5 +1,7 @@
 @page "/ai-chat"
+@attribute [Authorize(Policy = AdminPolicies.AccessAdmin)]
 @inject AiChatService AiChatClient
+@inject SystemConfigurationService SystemConfiguration
 @inject ISnackbar Snackbar
 
 <PageTitle>AI Chat</PageTitle>
@@ -12,8 +14,15 @@
             </MudAvatar>
             <div class="ai-chat-title">
                 <MudText Typo="Typo.h5">AI Chat</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Current client is managed from Admin AI APIs.</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Choose a configured client for this chat session.</MudText>
             </div>
+            <MudSelect T="string" Label="Provider" Value="@SelectedProviderKey" ValueChanged="SelectProviderAsync"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="IsLoading || IsSending">
+                @foreach (var provider in Providers)
+                {
+                    <MudSelectItem T="string" Value="@provider.Key">@provider.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
             <MudSpacer />
             @if (Status is not null)
             {
@@ -126,6 +135,8 @@
 
 @code {
     private AiChatStatusResponse? Status { get; set; }
+    private IReadOnlyList<AiApiProviderSettings> Providers { get; set; } = [];
+    private string SelectedProviderKey { get; set; } = string.Empty;
     private List<AiChatTurn> Turns { get; } = [];
     private string Prompt { get; set; } = "Hello! What's your name?";
     private string? ErrorMessage { get; set; }
@@ -152,7 +163,15 @@
 
         try
         {
-            Status = await AiChatClient.GetStatusAsync();
+            var settings = await SystemConfiguration.GetAiApiSettingsAsync();
+            Providers = settings.Providers;
+
+            if (!Providers.Any(provider => string.Equals(provider.Key, SelectedProviderKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                SelectedProviderKey = settings.CurrentProvider;
+            }
+
+            Status = await AiChatClient.GetStatusAsync(SelectedProviderKey);
         }
         catch (Exception ex)
         {
@@ -179,7 +198,12 @@
 
         try
         {
-            var response = await AiChatClient.ChatAsync(new AiChatRequest(message));
+            var conversation = Turns
+                .Select(turn => new AiChatMessage(
+                    turn.Role == "You" ? "user" : "assistant",
+                    turn.Message))
+                .ToList();
+            var response = await AiChatClient.ChatAsync(new AiChatRequest(message, SelectedProviderKey, conversation));
             Turns.Add(new AiChatTurn(response.Provider, response.Message));
         }
         catch (Exception ex)
@@ -196,6 +220,19 @@
     private void UpdatePrompt(string value)
     {
         Prompt = value;
+    }
+
+    private async Task SelectProviderAsync(string providerKey)
+    {
+        if (string.Equals(SelectedProviderKey, providerKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SelectedProviderKey = providerKey;
+        Turns.Clear();
+        ErrorMessage = null;
+        await LoadStatusAsync();
     }
 
     private async Task HandleComposerKeyDown(KeyboardEventArgs args)

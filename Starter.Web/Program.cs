@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using System.Threading.RateLimiting;
+using StackExchange.Redis;
 using Starter.Web;
 using Starter.Web.Components;
 using Starter.Web.Data;
@@ -15,12 +19,29 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddRedisOutputCache("cache");
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("account", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
+    });
+});
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddDataProtection();
+var cacheConnectionString = builder.Configuration.GetConnectionString("cache")
+    ?? throw new InvalidOperationException("Connection string 'cache' was not found.");
+var redisConnection = ConnectionMultiplexer.Connect($"{cacheConnectionString},abortConnect=false");
+builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+builder.Services.AddDataProtection()
+    .SetApplicationName("Starter.Web")
+    .PersistKeysToStackExchangeRedis(redisConnection, "Starter.Web:DataProtectionKeys");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("starterdb")
@@ -93,6 +114,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseRateLimiter();
 
 app.UseAntiforgery();
 

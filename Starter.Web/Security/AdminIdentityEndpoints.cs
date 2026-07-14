@@ -11,15 +11,14 @@ public static class AdminIdentityEndpoints
     {
         endpoints.MapPost("/admin/sign-in", SignInAsync)
             .AllowAnonymous()
-            .DisableAntiforgery();
+            .RequireRateLimiting("account");
 
         endpoints.MapPost("/admin/sign-out", async (SignInManager<ApplicationUser> signInManager) =>
             {
                 await signInManager.SignOutAsync();
                 return Results.Redirect("/admin/login");
             })
-            .RequireAuthorization()
-            .DisableAntiforgery();
+            .RequireAuthorization();
 
         return endpoints;
     }

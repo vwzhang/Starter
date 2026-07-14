@@ -9,6 +9,9 @@ public static class SystemConfigurationKeys
     public const string AiOpenAiEndpoint = "ai.openai.endpoint";
     public const string AiOpenAiModel = "ai.openai.model";
     public const string AiOpenAiApiKey = "ai.openai.api_key";
+    public const string AiDeepSeekEndpoint = "ai.deepseek.endpoint";
+    public const string AiDeepSeekModel = "ai.deepseek.model";
+    public const string AiDeepSeekApiKey = "ai.deepseek.api_key";
     public const string AiGeminiEndpoint = "ai.gemini.endpoint";
     public const string AiGeminiModel = "ai.gemini.model";
     public const string AiGeminiApiKey = "ai.gemini.api_key";
@@ -66,6 +69,7 @@ public sealed record SystemConfigurationSummary(
 public static class AiApiProviderKeys
 {
     public const string OpenAi = "openai";
+    public const string DeepSeek = "deepseek";
     public const string Gemini = "gemini";
     public const string GitHub = "github";
     public const string Groq = "groq";
