@@ -27,6 +27,7 @@
                 }
 
                 <form method="post" action="@RegisterAction" class="admin-login-form">
+                    <AntiforgeryToken />
                     <input name="Email" type="email" autocomplete="username" placeholder="Email" required />
                     <input name="DisplayName" type="text" autocomplete="name" placeholder="Display name" />
                     <input name="Password" type="password" autocomplete="new-password" placeholder="Password" required />

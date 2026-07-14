@@ -17,6 +17,7 @@
         </div>
         <MudSpacer />
         <form method="post" action="/admin/sign-out">
+            <AntiforgeryToken />
             <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Logout">
                 Sign out
             </MudButton>

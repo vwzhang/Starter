@@ -84,7 +84,7 @@ public sealed class SystemConfigurationService(
                 setting.Key,
                 setting.Name,
                 setting.Category,
-                GetDisplayValue(setting.Value, setting.ValueType),
+                GetDisplayValue(GetEffectiveValue(setting), setting.ValueType),
                 setting.DefaultValue,
                 setting.ValueType,
                 setting.Description))
@@ -184,6 +184,12 @@ public sealed class SystemConfigurationService(
                     await GetValueAsync(SystemConfigurationKeys.AiOpenAiModel),
                     await GetValueAsync(SystemConfigurationKeys.AiOpenAiApiKey)),
                 new(
+                    AiApiProviderKeys.DeepSeek,
+                    "DeepSeek",
+                    await GetValueAsync(SystemConfigurationKeys.AiDeepSeekEndpoint),
+                    await GetValueAsync(SystemConfigurationKeys.AiDeepSeekModel),
+                    await GetValueAsync(SystemConfigurationKeys.AiDeepSeekApiKey)),
+                new(
                     AiApiProviderKeys.Gemini,
                     "Gemini",
                     await GetValueAsync(SystemConfigurationKeys.AiGeminiEndpoint),
@@ -237,14 +243,37 @@ public sealed class SystemConfigurationService(
             updates.Add((keys.Value.ApiKeyKey, provider.ApiKey));
         }
 
-        foreach (var item in updates)
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var updateValues = updates.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        var settings = await dbContext.Settings
+            .Where(setting => updateValues.Keys.Contains(setting.Key))
+            .ToListAsync();
+
+        if (settings.Count != updateValues.Count)
         {
-            var result = await SaveSettingValueAsync(item.Key, item.Value);
-            if (!result.Succeeded)
-            {
-                return result;
-            }
+            return AdminMutationResult.Failure("One or more AI settings were not found.");
         }
+
+        foreach (var setting in settings)
+        {
+            var normalizedValue = NormalizeValue(updateValues[setting.Key], setting.ValueType);
+            if (normalizedValue is null)
+            {
+                return AdminMutationResult.Failure($"Value for '{setting.Name}' does not match the setting type.");
+            }
+
+            if (setting.ValueType == SystemConfigurationValueTypes.Secret
+                && string.IsNullOrEmpty(normalizedValue))
+            {
+                continue;
+            }
+
+            setting.Value = GetStoredValue(normalizedValue, setting.ValueType);
+            setting.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync();
 
         return AdminMutationResult.Success("AI API configuration saved.");
     }
@@ -254,39 +283,14 @@ public sealed class SystemConfigurationService(
         return bool.TryParse(await GetValueAsync(key), out var value) && value;
     }
 
-    private async Task<AdminMutationResult> SaveSettingValueAsync(string key, string value)
-    {
-        using var scope = scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var setting = await dbContext.Settings.SingleOrDefaultAsync(item => item.Key == key);
-
-        if (setting is null)
-        {
-            return AdminMutationResult.Failure($"Setting '{key}' not found.");
-        }
-
-        var normalizedValue = NormalizeValue(value, setting.ValueType);
-
-        if (normalizedValue is null)
-        {
-            return AdminMutationResult.Failure($"Value for '{setting.Name}' does not match the setting type.");
-        }
-
-        if (setting.ValueType == SystemConfigurationValueTypes.Secret
-            && string.IsNullOrEmpty(normalizedValue))
-        {
-            return AdminMutationResult.Success("Setting saved.");
-        }
-
-        setting.Value = GetStoredValue(normalizedValue, setting.ValueType);
-        setting.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await dbContext.SaveChangesAsync();
-        return AdminMutationResult.Success("Setting saved.");
-    }
-
     private async Task<string> GetValueAsync(string key)
     {
+        var configuredSecret = GetSecretOverride(key);
+        if (!string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return configuredSecret;
+        }
+
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var setting = await dbContext.Settings.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key);
@@ -298,6 +302,28 @@ public sealed class SystemConfigurationService(
 
         var definition = GetDefinitions().Single(item => item.Key == key);
         return GetDefaultValue(definition);
+    }
+
+    private string GetEffectiveValue(ApplicationSetting setting)
+    {
+        var configuredSecret = GetSecretOverride(setting.Key);
+        return string.IsNullOrWhiteSpace(configuredSecret)
+            ? GetRuntimeValue(setting.Value, setting.ValueType)
+            : configuredSecret;
+    }
+
+    private string? GetSecretOverride(string key)
+    {
+        return key switch
+        {
+            SystemConfigurationKeys.AiOpenAiApiKey => configuration["AI:OpenAI:ApiKey"],
+            SystemConfigurationKeys.AiDeepSeekApiKey => configuration["AI:DeepSeek:ApiKey"],
+            SystemConfigurationKeys.AiGeminiApiKey => configuration["AI:Gemini:ApiKey"],
+            SystemConfigurationKeys.AiGitHubApiKey => configuration["AI:GitHub:ApiKey"],
+            SystemConfigurationKeys.AiGroqApiKey => configuration["AI:Groq:ApiKey"],
+            SystemConfigurationKeys.AiAzureFoundryApiKey => configuration["AI:AzureFoundry:ApiKey"],
+            _ => null,
+        };
     }
 
     private SystemConfigurationDefinition[] GetDefinitions()
@@ -348,6 +374,30 @@ public sealed class SystemConfigurationService(
                 "",
                 "",
                 "OpenAI API key."),
+            new(
+                SystemConfigurationKeys.AiDeepSeekEndpoint,
+                "DeepSeek endpoint",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "https://api.deepseek.com/chat/completions",
+                "https://api.deepseek.com/chat/completions",
+                "DeepSeek OpenAI-compatible Chat Completions endpoint."),
+            new(
+                SystemConfigurationKeys.AiDeepSeekModel,
+                "DeepSeek model",
+                "AI",
+                SystemConfigurationValueTypes.Text,
+                "deepseek-chat",
+                "deepseek-chat",
+                "DeepSeek model name to use for AI chat."),
+            new(
+                SystemConfigurationKeys.AiDeepSeekApiKey,
+                "DeepSeek API key",
+                "AI",
+                SystemConfigurationValueTypes.Secret,
+                "",
+                "",
+                "DeepSeek API key."),
             new(
                 SystemConfigurationKeys.AiGeminiEndpoint,
                 "Gemini endpoint",
@@ -559,6 +609,10 @@ public sealed class SystemConfigurationService(
                 SystemConfigurationKeys.AiOpenAiEndpoint,
                 SystemConfigurationKeys.AiOpenAiModel,
                 SystemConfigurationKeys.AiOpenAiApiKey),
+            AiApiProviderKeys.DeepSeek => new(
+                SystemConfigurationKeys.AiDeepSeekEndpoint,
+                SystemConfigurationKeys.AiDeepSeekModel,
+                SystemConfigurationKeys.AiDeepSeekApiKey),
             AiApiProviderKeys.Gemini => new(
                 SystemConfigurationKeys.AiGeminiEndpoint,
                 SystemConfigurationKeys.AiGeminiModel,

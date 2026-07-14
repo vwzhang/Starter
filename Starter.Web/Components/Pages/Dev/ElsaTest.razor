@@ -1,0 +1,679 @@
+@page "/dev/elsa"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
+@inject ISnackbar Snackbar
+@using Starter.Experiment
+@using Elsa.Workflows
+
+<PageTitle>Elsa Workflow Studio Simulator</PageTitle>
+
+<MudStack Spacing="4">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">Elsa Workflow Studio Simulator</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Demonstrating Workflow Editor & Viewer capabilities in an offline-ready environment. Dynamic C# compilation & log tracking.</MudText>
+    </div>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+        <!-- TAB 1: Studio Viewer & Execution -->
+        <MudTabPanel Text="Studio Monitor & Execution (Viewer)" Icon="@Icons.Material.Filled.Visibility">
+            <MudGrid>
+                <!-- Inputs & Presets (Left Side) -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-4 starter-card" Outlined="true" Style="background: radial-gradient(circle at top left, #ffffff, #f9fafd);">
+                        <MudStack Spacing="4">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">1. Order Inputs</MudText>
+                            
+                            <MudNumericField @bind-Value="OrderAmount" 
+                                             Label="Order Amount ($)" 
+                                             Format="N2" 
+                                             Variant="Variant.Outlined" 
+                                             Min="0.0" 
+                                             Adornment="Adornment.Start" 
+                                             AdornmentIcon="@Icons.Material.Filled.AttachMoney" />
+                            
+                            <MudCheckBox @bind-Value="CustomerVIP" 
+                                         Label="Customer is VIP" 
+                                         Color="Color.Primary" />
+        
+                            <MudTextField @bind-Value="ItemsString" 
+                                           Label="Order Items (comma-separated)" 
+                                           Variant="Variant.Outlined" 
+                                           HelperText="Tip: Add out-of-stock items to test rejections." />
+
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Scenario Presets:</MudText>
+                                <MudGrid Spacing="1">
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true" OnClick="@(() => ApplyPreset(250.00, false, "laptop, headset"))">Auto-Approve</MudButton>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true" Color="Color.Warning" OnClick="@(() => ApplyPreset(450.00, false, "laptop, iphone [out-of-stock], mouse"))">Out-of-Stock</MudButton>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true" Color="Color.Error" OnClick="@(() => ApplyPreset(1500.00, false, "macbook, monitor"))">Manual Review</MudButton>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true" Color="Color.Success" OnClick="@(() => ApplyPreset(2000.00, true, "server, switch"))">VIP High-Value</MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudStack>
+        
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.PlayCircleFilled" 
+                                       OnClick="RunWorkflowAsync" 
+                                       Disabled="IsRunning"
+                                       Class="py-2.5">
+                                Execute Elsa Workflow
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Workflow Graphic Diagram (Middle/Right) -->
+                <MudItem xs="12" md="8">
+                    <MudPaper Class="pa-4 starter-card" Outlined="true" Style="min-height: 520px; background-color: #fafafa;">
+                        <MudStack Spacing="4">
+                            <div class="d-flex align-items-center">
+                                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Color="Color.Primary" Class="mr-2" />
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Workflow Designer Canvas (Live Monitor)</MudText>
+                                <MudSpacer />
+                                @if (IsRunning)
+                                {
+                                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                                }
+                            </div>
+                            
+                            <MudDivider />
+
+                            <!-- Canvas rendering the interactive graph -->
+                            <div class="d-flex flex-column align-items-center py-4" style="background-color: #ffffff; border: 1px dashed #d0d0d0; border-radius: 8px; position: relative; min-height: 380px;">
+                                
+                                @* 1. Initialize Order *@
+                                @if (Schema.EnableInitializeOrder)
+                                {
+                                    @RenderNode("Initialize Order", "InitializeOrderActivity", NodeInitStatus)
+                                    @RenderArrow()
+                                }
+
+                                @* 2. Inventory Check *@
+                                @if (Schema.EnableInventoryCheck)
+                                {
+                                    @RenderNode("Inventory Check (Loop)", "ProcessItemActivity", NodeInventoryStatus)
+                                    @RenderArrow()
+                                }
+
+                                @* 3. Evaluate Approval *@
+                                @if (Schema.EnableEvaluateApproval)
+                                {
+                                    @RenderNode("Evaluate Approval", "EvaluateApprovalActivity", NodeApprovalStatus)
+                                    @RenderArrow()
+                                }
+
+                                @* 4. Process Payment *@
+                                @if (Schema.EnableProcessPayment)
+                                {
+                                    @RenderNode("Process Payment", "ProcessPaymentActivity", NodePaymentStatus)
+                                    @RenderArrow()
+                                }
+
+                                @* 5. Custom WriteLine Log *@
+                                @if (Schema.EnableCustomLog)
+                                {
+                                    @RenderNode("Custom WriteLine Log", "WriteLine", NodeCustomLogStatus)
+                                    @RenderArrow()
+                                }
+
+                                @* 6. Finalize Order *@
+                                @if (Schema.EnableFinalizeOrder)
+                                {
+                                    @RenderNode("Finalize Order", "FinalizeOrderActivity", NodeFinalStatus)
+                                }
+                            </div>
+
+                            @if (Executed)
+                            {
+                                <MudAlert Severity="@GetAlertSeverity()" Variant="Variant.Filled" Dense="true">
+                                    ResultTracker.Value: <b>@OutputResult</b>
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @if (Executed)
+            {
+                <MudGrid Class="mt-4" Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4 starter-card" Outlined="true">
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Repeat" Color="Color.Primary" />
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Loop Iterations</MudText>
+                                    <MudSpacer />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                        @LoopIterations.Count iteration(s)
+                                    </MudChip>
+                                </MudStack>
+                                <MudTable Items="LoopIterations" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>#</MudTh>
+                                        <MudTh>Item</MudTh>
+                                        <MudTh>Outcome</MudTh>
+                                        <MudTh>Status</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="iteration">
+                                        <MudTd DataLabel="#">@iteration.Iteration</MudTd>
+                                        <MudTd DataLabel="Item">@iteration.Item</MudTd>
+                                        <MudTd DataLabel="Outcome">
+                                            <MudChip T="string" Size="Size.Small" Color="@GetLoopOutcomeColor(iteration.Outcome)" Variant="Variant.Outlined">
+                                                @iteration.Outcome
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Status">@iteration.OrderStatusAfterIteration</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No loop iterations ran.</MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4 starter-card" Outlined="true">
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Rule" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Condition Decisions</MudText>
+                                    <MudSpacer />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @ConditionDecisions.Count decision(s)
+                                    </MudChip>
+                                </MudStack>
+                                <MudTable Items="ConditionDecisions" Dense="true" Hover="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Expression</MudTh>
+                                        <MudTh>Result</MudTh>
+                                        <MudTh>Outcome</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="decision">
+                                        <MudTd DataLabel="Name">@decision.Name</MudTd>
+                                        <MudTd DataLabel="Expression">
+                                            <code style="font-size: 11px;">@decision.Expression</code>
+                                        </MudTd>
+                                        <MudTd DataLabel="Result">
+                                            <MudChip T="string" Size="Size.Small" Color="@(decision.Result ? Color.Success : Color.Warning)" Variant="Variant.Outlined">
+                                                @decision.Result
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Outcome">@decision.Outcome</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No conditional branches were evaluated.</MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <!-- Execution Logs (Terminal UI) -->
+            <MudPaper Class="pa-4 mt-4 bg-dark text-light" Outlined="true" Style="background-color: #1e1e1e; font-family: Consolas, monospace; min-height: 180px;">
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-white-50">Studio Execution Console Output Logs</MudText>
+                <div class="mt-2" style="max-height: 180px; overflow-y: auto; font-size: 12px; line-height: 1.5;">
+                    @if (WorkflowLogs.Any())
+                    {
+                        @foreach (var log in WorkflowLogs)
+                        {
+                            <div style="@GetLogStyle(log)">@log</div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-white-50">Console is idle. Trigger execution to stream logs...</div>
+                    }
+                </div>
+            </MudPaper>
+        </MudTabPanel>
+
+        <!-- TAB 2: Studio Schema Editor -->
+        <MudTabPanel Text="Studio Schema Editor (Editor)" Icon="@Icons.Material.Filled.Edit">
+            <MudPaper Class="pa-6 starter-card" Outlined="true">
+                <MudStack Spacing="5">
+                    <div>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Interactive Workflow Editor & Builder</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Configure activity parameters, toggle node availability (simulate add/delete), and dynamically re-assemble the C# Elsa workflow.</MudText>
+                    </div>
+
+                    <MudDivider />
+
+                    <MudGrid>
+                        <!-- Left Panel: Node Toggles -->
+                        <MudItem xs="12" md="6">
+                            <MudStack Spacing="3">
+                                <MudText Typo="Typo.subtitle2" Class="font-weight-bold" Color="Color.Primary">Activity Layout & Toggles (Add/Remove)</MudText>
+                                
+                                <MudSwitch @bind-Value="Schema.EnableInitializeOrder" Label="Initialize Order Node" Color="Color.Primary" />
+                                <MudSwitch @bind-Value="Schema.EnableInventoryCheck" Label="Inventory Check Node (ForEach Loop)" Color="Color.Primary" />
+                                <MudSwitch @bind-Value="Schema.EnableEvaluateApproval" Label="Evaluate Approval Node (Threshold Branch)" Color="Color.Primary" />
+                                <MudSwitch @bind-Value="Schema.EnableProcessPayment" Label="Process Payment Node" Color="Color.Primary" />
+                                <MudSwitch @bind-Value="Schema.EnableCustomLog" Label="Add custom WriteLine Log Node" Color="Color.Primary" />
+                                <MudSwitch @bind-Value="Schema.EnableFinalizeOrder" Label="Finalize Order Node" Color="Color.Primary" />
+                            </MudStack>
+                        </MudItem>
+
+                        <!-- Right Panel: Node Properties -->
+                        <MudItem xs="12" md="6">
+                            <MudStack Spacing="4">
+                                <MudText Typo="Typo.subtitle2" Class="font-weight-bold" Color="Color.Primary">Activity Properties Panel</MudText>
+
+                                <!-- Inventory Keywords Configuration -->
+                                <div style="@(Schema.EnableInventoryCheck ? "" : "opacity: 0.5; pointer-events: none;")">
+                                    <MudTextField @bind-Value="OutOfStockKeywordsString" 
+                                                   Label="Out of Stock Keywords (comma-separated)" 
+                                                   Variant="Variant.Outlined" 
+                                                   Placeholder="out-of-stock, sold-out"
+                                                   HelperText="Triggers inventory rejection if any keyword matches item text." />
+                                </div>
+
+                                <!-- Approval Threshold Configuration -->
+                                <div style="@(Schema.EnableEvaluateApproval ? "" : "opacity: 0.5; pointer-events: none;")">
+                                    <MudNumericField @bind-Value="Schema.ApprovalThreshold" 
+                                                     Label="Evaluate Approval Threshold ($)" 
+                                                     Format="N2" 
+                                                     Variant="Variant.Outlined" 
+                                                     Min="0.0" 
+                                                     HelperText="Orders exceeding this require VIP status to auto-approve." />
+                                </div>
+
+                                <!-- WriteLine Message Configuration -->
+                                <div style="@(Schema.EnableCustomLog ? "" : "opacity: 0.5; pointer-events: none;")">
+                                    <MudTextField @bind-Value="Schema.CustomLogMessage" 
+                                                   Label="Custom Log Message" 
+                                                   Variant="Variant.Outlined" 
+                                                   HelperText="The text that the Custom WriteLine activity prints." />
+                                </div>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider />
+
+                    <div class="d-flex justify-content-end">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   OnClick="ApplySchema"
+                                   Size="Size.Large">
+                            Apply & Save Schema
+                        </MudButton>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+
+    <!-- Details Drawer (Viewer Node Clicking) -->
+    <MudDrawer @bind-Open="@IsDrawerOpen" Anchor="Anchor.Right" Width="360px" Elevation="16" Variant="@DrawerVariant.Temporary">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6" Class="font-weight-bold">Activity Detail Inspector</MudText>
+        </MudDrawerHeader>
+        <div class="pa-4">
+            <MudStack Spacing="3">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    Node: <b>@SelectedNodeName</b><br/>
+                    Type: <code style="font-size: 11px;">@SelectedNodeType</code>
+                </MudAlert>
+
+                <div>
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Status in Last Run:</MudText>
+                    <MudText Typo="Typo.body2" Color="@GetStatusColor(SelectedNodeStatus)">@SelectedNodeStatus</MudText>
+                </div>
+
+                <MudDivider />
+
+                <div>
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Dynamic Configuration:</MudText>
+                    <MudText Typo="Typo.body2" Style="white-space: pre-line; font-family: monospace; font-size: 11px; background-color: #fafafa;" Class="pa-2 rounded border mt-1">@SelectedNodeDetail</MudText>
+                </div>
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@(() => IsDrawerOpen = false)" Class="mt-4">Close Details</MudButton>
+            </MudStack>
+        </div>
+    </MudDrawer>
+</MudStack>
+
+@code {
+    private double OrderAmount { get; set; } = 250.00;
+    private bool CustomerVIP { get; set; } = false;
+    private string ItemsString { get; set; } = "laptop, headset";
+    
+    private string OutputResult { get; set; } = string.Empty;
+    private List<string> WorkflowLogs { get; set; } = new();
+    private List<LoopIterationResult> LoopIterations { get; set; } = new();
+    private List<ConditionDecision> ConditionDecisions { get; set; } = new();
+    
+    private bool IsRunning { get; set; }
+    private bool Executed { get; set; }
+
+    // Simulation Schema state
+    private WorkflowSchema Schema { get; set; } = new();
+    private string OutOfStockKeywordsString { get; set; } = "out-of-stock, sold-out";
+
+    // Monitor states
+    private string NodeInitStatus { get; set; } = "Pending";
+    private string NodeInventoryStatus { get; set; } = "Pending";
+    private string NodeApprovalStatus { get; set; } = "Pending";
+    private string NodePaymentStatus { get; set; } = "Pending";
+    private string NodeCustomLogStatus { get; set; } = "Pending";
+    private string NodeFinalStatus { get; set; } = "Pending";
+
+    // Inspector Drawer state
+    private bool IsDrawerOpen { get; set; }
+    private string SelectedNodeName { get; set; } = string.Empty;
+    private string SelectedNodeType { get; set; } = string.Empty;
+    private string SelectedNodeStatus { get; set; } = string.Empty;
+    private string SelectedNodeDetail { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        ApplySchema();
+    }
+
+    private void ApplySchema()
+    {
+        // Parse comma-separated keywords
+        var keywords = OutOfStockKeywordsString
+            .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(k => k.Trim())
+            .ToList();
+        
+        Schema.OutOfStockKeywords = keywords;
+        
+        // Reset node visual states based on Schema settings
+        ResetNodeStates();
+        
+        Snackbar.Add("Workflow configuration schema compiled successfully!", Severity.Success);
+    }
+
+    private void ResetNodeStates()
+    {
+        NodeInitStatus = Schema.EnableInitializeOrder ? "Pending" : "Disabled";
+        NodeInventoryStatus = Schema.EnableInventoryCheck ? "Pending" : "Disabled";
+        NodeApprovalStatus = Schema.EnableEvaluateApproval ? "Pending" : "Disabled";
+        NodePaymentStatus = Schema.EnableProcessPayment ? "Pending" : "Disabled";
+        NodeCustomLogStatus = Schema.EnableCustomLog ? "Pending" : "Disabled";
+        NodeFinalStatus = Schema.EnableFinalizeOrder ? "Pending" : "Disabled";
+    }
+
+    private void ApplyPreset(double amount, bool vip, string items)
+    {
+        OrderAmount = amount;
+        CustomerVIP = vip;
+        ItemsString = items;
+        Snackbar.Add("Preset inputs loaded!", Severity.Info);
+    }
+
+    private async Task RunWorkflowAsync()
+    {
+        IsRunning = true;
+        Executed = false;
+        WorkflowLogs.Clear();
+        LoopIterations.Clear();
+        ConditionDecisions.Clear();
+        ResetNodeStates();
+        StateHasChanged();
+
+        try
+        {
+            // Parse items list
+            var itemsList = ItemsString
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(item => item.Trim())
+                .ToList();
+
+            // Run Elsa 3 Workflow with compiled schema
+            var result = await ElsaExperiment.RunOrderWorkflowAsync(OrderAmount, CustomerVIP, itemsList, Schema);
+            
+            OutputResult = result.FinalValue;
+            WorkflowLogs = result.Logs.ToList();
+            LoopIterations = result.LoopIterations.ToList();
+            ConditionDecisions = result.ConditionDecisions.ToList();
+            Executed = true;
+            
+            // Analyze real logs to update live viewer node statuses
+            AnalyzeExecutionLogs(WorkflowLogs);
+            
+            Snackbar.Add("Workflow run successfully. Canvas states updated!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Workflow run failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
+    private void AnalyzeExecutionLogs(List<string> logs)
+    {
+        ResetNodeStates();
+        if (logs == null || !logs.Any()) return;
+
+        bool hasInventoryError = false;
+
+        foreach (var log in logs)
+        {
+            if (log.Contains("[InitializeOrderActivity]"))
+            {
+                if (log.Contains("Rejecting order immediately"))
+                    NodeInitStatus = "Failed";
+                else
+                    NodeInitStatus = "Completed";
+            }
+            if (log.Contains("[ProcessItemActivity]"))
+            {
+                if (log.Contains("OUT OF STOCK"))
+                {
+                    NodeInventoryStatus = "Failed";
+                    hasInventoryError = true;
+                }
+                else if (NodeInventoryStatus != "Failed")
+                {
+                    NodeInventoryStatus = "Completed";
+                }
+            }
+            if (log.Contains("[EvaluateApprovalActivity]"))
+            {
+                NodeApprovalStatus = "Completed";
+            }
+            if (log.Contains("[ProcessPaymentActivity]"))
+            {
+                if (log.Contains("Skipping payment processing"))
+                    NodePaymentStatus = "Skipped";
+                else
+                    NodePaymentStatus = "Completed";
+            }
+            if (Schema.EnableCustomLog && log.Contains(Schema.CustomLogMessage))
+            {
+                NodeCustomLogStatus = "Completed";
+            }
+            if (log.Contains("[FinalizeOrderActivity]"))
+            {
+                NodeFinalStatus = "Completed";
+            }
+        }
+
+        // Apply dynamic skips based on flow control
+        if (NodeInitStatus == "Failed")
+        {
+            if (Schema.EnableInventoryCheck) NodeInventoryStatus = "Skipped";
+            if (Schema.EnableEvaluateApproval) NodeApprovalStatus = "Skipped";
+            if (Schema.EnableProcessPayment) NodePaymentStatus = "Skipped";
+        }
+        else if (hasInventoryError)
+        {
+            if (Schema.EnableEvaluateApproval) NodeApprovalStatus = "Skipped";
+            if (Schema.EnableProcessPayment) NodePaymentStatus = "Skipped";
+        }
+        else if (NodeApprovalStatus == "Pending" && NodeInitStatus == "Completed")
+        {
+            if (Schema.EnableEvaluateApproval) NodeApprovalStatus = "Skipped";
+            if (Schema.EnableProcessPayment) NodePaymentStatus = "Skipped";
+        }
+        
+        if (NodePaymentStatus == "Pending" && NodeApprovalStatus == "Completed")
+        {
+            if (Schema.EnableProcessPayment) NodePaymentStatus = "Skipped";
+        }
+    }
+
+    private void InspectNode(string name, string type, string status)
+    {
+        SelectedNodeName = name;
+        SelectedNodeType = type;
+        SelectedNodeStatus = status;
+
+        if (status == "Disabled")
+        {
+            SelectedNodeDetail = "This activity has been disabled/removed in the Studio Schema Editor.\n\nIt is omitted during workflow compilation.";
+            IsDrawerOpen = true;
+            return;
+        }
+
+        SelectedNodeDetail = name switch
+        {
+            "Initialize Order" => 
+                $"Input Variables:\n- OrderAmount: {OrderAmount:C2}\n- CustomerVIP: {CustomerVIP}\n- Items: {ItemsString}\n\nOutputs:\n- Set Variable 'OrderStatus' = 'Pending'\n\nBehavior:\n- Validates item counts; rejects immediately if empty.",
+            
+            "Inventory Check (Loop)" => 
+                $"Input Variables:\n- Items: {ItemsString}\n\nNode Properties:\n- Keywords Check: {OutOfStockKeywordsString}\n\nLast Run:\n- Iterations: {LoopIterations.Count}\n- Outcomes: {string.Join(", ", LoopIterations.Select(item => $"{item.Item}={item.Outcome}"))}\n\nBehavior:\n- Loops through elements; changes 'OrderStatus' to 'Rejected' if an item matches keywords.",
+            
+            "Evaluate Approval" => 
+                $"Input Variables:\n- OrderAmount: {OrderAmount:C2}\n- CustomerVIP: {CustomerVIP}\n\nNode Properties:\n- Threshold Limit: {Schema.ApprovalThreshold:C2}\n\nLast Run:\n- Branches: {string.Join(", ", ConditionDecisions.Where(item => item.Name.Contains("branch", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("approval", StringComparison.OrdinalIgnoreCase)).Select(item => $"{item.Name} => {item.Outcome}"))}\n\nBehavior:\n- Approves automatically if below threshold. Requires VIP to auto-approve above threshold, otherwise escalates status to 'ManualReview'.",
+            
+            "Process Payment" => 
+                $"Input Variables:\n- OrderStatus: (dynamic)\n- OrderAmount: {OrderAmount:C2}\n\nBehavior:\n- Executes payment charge if 'OrderStatus' is 'Approved'; skips otherwise.",
+            
+            "Custom WriteLine Log" => 
+                $"Properties:\n- Text Message: \"{Schema.CustomLogMessage}\"\n\nBehavior:\n- Synchronously prints custom diagnostic message to standard workflow console log.",
+            
+            "Finalize Order" => 
+                $"State Read:\n- OrderStatus: (final value)\n\nOutputs:\n- Writes results to DI ResultTracker singleton.",
+            
+            _ => "No additional configurations specified."
+        };
+
+        IsDrawerOpen = true;
+    }
+
+    private Severity GetAlertSeverity()
+    {
+        if (OutputResult.Contains("Approved")) return Severity.Success;
+        if (OutputResult.Contains("ManualReview")) return Severity.Warning;
+        if (OutputResult.Contains("Rejected")) return Severity.Error;
+        return Severity.Info;
+    }
+
+    private string GetLogStyle(string log)
+    {
+        if (log.Contains("OUT OF STOCK") || log.Contains("Rejecting order") || log.Contains("rejections"))
+            return "color: #ff5252;"; // Red
+        if (log.Contains("Escaped to Manual Review") || log.Contains("Escalating") || log.Contains("Manual Review"))
+            return "color: #ffb74d;"; // Orange/Yellow
+        if (log.Contains("Approved") || log.Contains("Approved transaction"))
+            return "color: #4caf50;"; // Green
+        if (log.Contains("[InitializeOrderActivity]"))
+            return "color: #4fc3f7;"; // Blue
+        if (log.Contains("[ProcessItemActivity]"))
+            return "color: #ba68c8;"; // Purple
+        if (log.Contains("[EvaluateApprovalActivity]"))
+            return "color: #ff8a65;"; // Orange-red
+        if (log.Contains("[ProcessPaymentActivity]"))
+            return "color: #26a69a;"; // Teal
+        if (log.Contains("[FinalizeOrderActivity]"))
+            return "color: #a1887f;"; // Brown/Gray
+        return "color: #ffffff;";
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Completed" => Color.Success,
+            "Failed" => Color.Error,
+            "Skipped" => Color.Warning,
+            "Disabled" => Color.Default,
+            _ => Color.Primary
+        };
+    }
+
+    private Color GetLoopOutcomeColor(string outcome)
+    {
+        return outcome switch
+        {
+            "InStock" => Color.Success,
+            "OutOfStock" => Color.Error,
+            "Skipped" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    // Helper render fragments
+    private RenderFragment RenderNode(string name, string type, string status) => __builder =>
+    {
+        var borderStyle = status switch
+        {
+            "Completed" => "border: 2px solid #4caf50; box-shadow: 0 0 10px rgba(76,175,80,0.3); background-color: #f1f8e9;",
+            "Failed" => "border: 2px solid #f44336; box-shadow: 0 0 10px rgba(244,67,54,0.3); background-color: #ffebee;",
+            "Skipped" => "border: 2px dashed #ff9800; opacity: 0.65; background-color: #fff8e1;",
+            "Disabled" => "border: 1px solid #9e9e9e; opacity: 0.4; background-color: #eeeeee; pointer-events: none;",
+            _ => "border: 1px solid #b0bec5; background-color: #ffffff;"
+        };
+
+        var icon = status switch
+        {
+            "Completed" => Icons.Material.Filled.CheckCircle,
+            "Failed" => Icons.Material.Filled.Cancel,
+            "Skipped" => Icons.Material.Filled.SkipNext,
+            "Disabled" => Icons.Material.Filled.Block,
+            _ => Icons.Material.Filled.RadioButtonUnchecked
+        };
+
+        var iconColor = status switch
+        {
+            "Completed" => Color.Success,
+            "Failed" => Color.Error,
+            "Skipped" => Color.Warning,
+            "Disabled" => Color.Default,
+            _ => Color.Secondary
+        };
+
+        <div class="pa-3 rounded d-flex align-items-center justify-content-between cursor-pointer" 
+             style="width: 320px; transition: all 0.3s ease; @borderStyle"
+             @onclick="@(() => InspectNode(name, type, status))">
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-0">@name</MudText>
+                <span style="font-size: 10px; opacity: 0.6;">@type</span>
+            </div>
+            <div class="d-flex align-items-center">
+                @if (status == "Disabled")
+                {
+                    <span style="font-size: 9px; font-weight: bold; background: #e0e0e0; padding: 2px 4px; border-radius: 4px;" class="mr-2 text-muted">Removed</span>
+                }
+                <MudIcon Icon="@icon" Color="@iconColor" Size="Size.Medium" />
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderArrow() => __builder =>
+    {
+        <div class="py-1">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Primary" Size="Size.Small" />
+        </div>
+    };
+}

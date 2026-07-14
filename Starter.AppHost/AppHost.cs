@@ -5,18 +5,19 @@ var builder = DistributedApplication.CreateBuilder(args);
 const string SeedCatalogSampleDataValue = "true";
 const string SeedDevelopmentTestUsersValue = "true";
 
-var cache = builder.AddRedis("cache");
+var cache = builder.AddRedis("cache")
+    .WithDataVolume();
 
 var smtp4dev = builder.AddContainer("smtp4dev", "rnwood/smtp4dev")
     .WithHttpEndpoint(targetPort: 80)
     .WithEndpoint(targetPort: 25, scheme: "tcp", name: "smtp")
-    .WithHttpHealthCheck("/");
+    .WithHttpHealthCheck("/api/messages");
 
 var smtpEndpoint = smtp4dev.GetEndpoint("smtp");
 
 const string PgAdminImageTag = "9.14.0";
-const string PgAdminDefaultEmail = "admin@domain.com";
-const string PgAdminDefaultPassword = "Happy1..";
+var pgAdminEmail = builder.AddParameter("pgadmin-email", value: "admin@domain.com");
+var pgAdminPassword = builder.AddParameter("pgadmin-password", secret: true);
 
 // PostgreSQL 18 server with a persistent data volume.
 var postgres = builder.AddPostgres("postgres")
@@ -27,18 +28,13 @@ postgres.WithPgAdmin(pgAdmin =>
 {
     pgAdmin
         .WithImageTag(PgAdminImageTag)
-        .WithEnvironment("PGADMIN_DEFAULT_EMAIL", PgAdminDefaultEmail)
-        .WithEnvironment("PGADMIN_DEFAULT_PASSWORD", PgAdminDefaultPassword)
+        .WithEnvironment("PGADMIN_DEFAULT_EMAIL", pgAdminEmail)
+        .WithEnvironment("PGADMIN_DEFAULT_PASSWORD", pgAdminPassword)
         .WithEnvironment("PGADMIN_CONFIG_SERVER_MODE", "False")
         .WithEnvironment("PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED", "False")
-        // Bind directly because pgAdmin's gunicorn responses can trip the Aspire proxy health check.
-        .WithHttpEndpoint(targetPort: 80, name: "http", isProxied: false)
+        .WithHttpEndpoint(targetPort: 80, name: "http")
         .WaitFor(postgres);
 
-    foreach (var healthCheck in pgAdmin.Resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())
-    {
-        pgAdmin.Resource.Annotations.Remove(healthCheck);
-    }
 }, "pgadmin");
 
 // Shared "starter" database consumed by both the API service and the web frontend.

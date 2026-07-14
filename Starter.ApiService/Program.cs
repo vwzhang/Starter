@@ -44,7 +44,10 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
-app.MapCatalogEndpoints();
+if (app.Environment.IsDevelopment())
+{
+    app.MapCatalogEndpoints();
+}
 
 app.MapDefaultEndpoints();
 

@@ -10,6 +10,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<ApplicationPermission> Permissions => Set<ApplicationPermission>();
     public DbSet<ApplicationRolePermission> RolePermissions => Set<ApplicationRolePermission>();
     public DbSet<ApplicationSetting> Settings => Set<ApplicationSetting>();
+    public DbSet<DevAgentConversation> DevAgentConversations => Set<DevAgentConversation>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -73,6 +74,15 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             entity.Property(setting => setting.DefaultValue).HasMaxLength(2048);
             entity.Property(setting => setting.ValueType).HasMaxLength(40);
             entity.Property(setting => setting.Description).HasMaxLength(512);
+        });
+
+        builder.Entity<DevAgentConversation>(entity =>
+        {
+            entity.ToTable("DevAgentConversations");
+            entity.HasIndex(conversation => conversation.Key).IsUnique();
+            entity.Property(conversation => conversation.Key).HasMaxLength(160);
+            entity.Property(conversation => conversation.Title).HasMaxLength(200);
+            entity.Property(conversation => conversation.TranscriptJson).HasColumnType("text");
         });
 
     }

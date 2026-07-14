@@ -1,0 +1,438 @@
+@page "/dev/agents-ai"
+@attribute [Authorize(Policy = AdminPolicies.ManageSystem)]
+@inject AiChatService AiChatService
+@inject AgentToolService AgentTools
+@inject AgentConversationStore ConversationStore
+@inject ISnackbar Snackbar
+@using Microsoft.Agents.AI
+@using Microsoft.Extensions.AI
+@using Starter.Experiment
+@using Starter.Web.Services
+
+<PageTitle>Agents.AI Test</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <div>
+            <MudText Typo="Typo.h4">Agents.AI Test</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Simple agents, real tool calling, guardrails, and multi-agent workflow experiments</MudText>
+        </div>
+        <MudSpacer />
+        @if (ExamplePattern == "Tools")
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearConversationAsync" Disabled="IsRunning || ConversationMessages.Count == 0">
+                Clear Memory
+            </MudButton>
+        }
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 starter-card" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.subtitle1">Configuration</MudText>
+
+                    <MudRadioGroup T="string" Value="@Mode" ValueChanged="OnModeChanged">
+                        <MudRadio Value="@("Mock")" Color="Color.Primary">Scripted LLM</MudRadio>
+                        <MudRadio Value="@("Online")" Color="Color.Secondary">Online LLM</MudRadio>
+                    </MudRadioGroup>
+
+                    @if (Mode == "Online")
+                    {
+                        @if (AiStatus is null)
+                        {
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        }
+                        else if (!AiStatus.IsConfigured)
+                        {
+                            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="py-2">
+                                @AiStatus.Message
+                                <MudButton Href="/admin/ai" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Settings" Class="ml-2">
+                                    Configure
+                                </MudButton>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="py-2">
+                                Online client ready: <b>@AiStatus.Provider</b> (@AiStatus.Model)
+                            </MudAlert>
+                        }
+                    }
+
+                    <MudSelect T="string" Label="Experiment" Value="@ExamplePattern" ValueChanged="OnPatternChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("Simple")">Simple Chat Agent</MudSelectItem>
+                        <MudSelectItem Value="@("Tools")">Internet + Catalog Tools</MudSelectItem>
+                        <MudSelectItem Value="@("Guardrails")">Guardrails Agent</MudSelectItem>
+                        <MudSelectItem Value="@("Workflow")">Writer + Editor Workflow</MudSelectItem>
+                    </MudSelect>
+
+                    @if (ExamplePattern == "Tools")
+                    {
+                        <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Internet search</MudChip>
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">PostgreSQL catalog</MudChip>
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@ConversationMessages.Count messages persisted</MudChip>
+                        </MudStack>
+                    }
+
+                    <MudTextField Label="@PromptLabel"
+                                  @bind-Value="Prompt"
+                                  Variant="Variant.Outlined"
+                                  Lines="4"
+                                  Placeholder="Type your prompt..." />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Send"
+                               OnClick="RunExperimentAsync"
+                               Disabled="@(IsRunning || (Mode == "Online" && AiStatus?.IsConfigured != true))">
+                        @(ExamplePattern == "Tools" ? "Send Turn" : "Run Experiment")
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudStack Spacing="3">
+                <MudPaper Class="pa-4 starter-card" Outlined="true" Style="min-height: 270px;">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Psychology" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1">Execution Output</MudText>
+                            <MudSpacer />
+                            @if (IsRunning)
+                            {
+                                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                            }
+                        </MudStack>
+
+                        <MudDivider />
+
+                        @if (ExamplePattern == "Tools")
+                        {
+                            <MudStack Spacing="2">
+                                @if (ConversationMessages.Count == 0 && !Executed && string.IsNullOrWhiteSpace(ErrorText))
+                                {
+                                    <div class="d-flex align-items-center justify-content-center" Style="height: 140px;">
+                                        <MudText Color="Color.Secondary">No conversation turns persisted yet.</MudText>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var message in ConversationMessages)
+                                    {
+                                        <MudPaper Class="pa-3" Outlined="true" Style="@GetConversationBubbleStyle(message.Role)">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@message.Role.ToUpperInvariant() · @message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</MudText>
+                                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@message.Text</MudText>
+                                        </MudPaper>
+                                    }
+                                }
+                            </MudStack>
+                        }
+                        else if (Executed)
+                        {
+                            <MudStack Spacing="2">
+                                @if (ExamplePattern == "Workflow" && WorkflowResult != null)
+                                {
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Writer Agent Output</MudText>
+                                            <MudPaper Class="pa-3 mt-1 bg-light" Outlined="true" Style="min-height: 100px;">
+                                                <MudText Typo="Typo.body2">@WorkflowResult.DraftText</MudText>
+                                            </MudPaper>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Editor Agent Output</MudText>
+                                            <MudPaper Class="pa-3 mt-1" Outlined="true" Style="min-height: 100px; border-left: 4px solid var(--mud-palette-success);">
+                                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@WorkflowResult.FinalText</MudText>
+                                            </MudPaper>
+                                        </MudItem>
+                                    </MudGrid>
+                                }
+                                else
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Prompt Sent</MudText>
+                                        <MudText Typo="Typo.body1" Class="italic">"@LastPrompt"</MudText>
+                                    </div>
+
+                                    <MudDivider />
+
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Agent Final Response</MudText>
+                                        <MudPaper Class="pa-3 mt-1 bg-light" Outlined="true">
+                                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@ResponseText</MudText>
+                                        </MudPaper>
+                                    </div>
+                                }
+                            </MudStack>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(ErrorText))
+                        {
+                            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                                <b>Execution failed:</b> @ErrorText
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-items-center justify-content-center" Style="height: 150px;">
+                                <MudText Color="Color.Secondary">Run the selected experiment to collect output.</MudText>
+                            </div>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Class="pa-4 starter-card" Outlined="true" Style="max-height: 320px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;">
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Terminal" Color="Color.Success" />
+                            <MudText Typo="Typo.subtitle2" Style="color: #4ec9b0;">Diagnostic & Agent Execution Logs</MudText>
+                            <MudSpacer />
+                            <MudButton Variant="Variant.Text" Color="Color.Inherit" Size="Size.Small" OnClick="ClearLogs" Disabled="Logs.Count == 0" Style="color: #d4d4d4;">Clear Logs</MudButton>
+                        </MudStack>
+                        <MudDivider Style="background-color: #3e3e3e;" />
+                        <div style="font-family: monospace; font-size: 12px; line-height: 1.6;">
+                            @if (Logs.Count == 0)
+                            {
+                                <span style="color: #6a9955;">// Logs are currently empty.</span>
+                            }
+                            else
+                            {
+                                @foreach (var log in Logs)
+                                {
+                                    <div class="py-0.5" style="@GetLogStyle(log)">@log</div>
+                                }
+                            }
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private const string ConversationKey = "dev.agents-ai.default";
+    private string Mode { get; set; } = "Mock";
+    private string ExamplePattern { get; set; } = "Tools";
+    private string Prompt { get; set; } = "Search the internet for .NET Aspire latest and search the local catalog database for support. Compare what you found with our stored product data.";
+    private string LastPrompt { get; set; } = string.Empty;
+    private string ResponseText { get; set; } = string.Empty;
+    private string ErrorText { get; set; } = string.Empty;
+    private bool IsRunning { get; set; }
+    private bool Executed { get; set; }
+    private Starter.Shared.AiChatStatusResponse? AiStatus { get; set; }
+    private List<string> Logs { get; } = [];
+    private List<AgentConversationMessage> ConversationMessages { get; set; } = [];
+    private MultiAgentWorkflowResult? WorkflowResult { get; set; }
+    private string PromptLabel => ExamplePattern == "Workflow" ? "Workflow Topic" : "Agent Prompt";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAiStatusAsync();
+        await LoadConversationAsync();
+    }
+
+    private async Task LoadAiStatusAsync()
+    {
+        try
+        {
+            AiStatus = await AiChatService.GetStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load AI status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadConversationAsync()
+    {
+        ConversationMessages = (await ConversationStore.LoadAsync(ConversationKey)).ToList();
+        if (ConversationMessages.Count > 0)
+        {
+            AddLog($"[Persistence] Loaded {ConversationMessages.Count} message(s) from PostgreSQL conversation store.");
+        }
+    }
+
+    private async Task OnModeChanged(string value)
+    {
+        Mode = value;
+        if (Mode == "Online")
+        {
+            await LoadAiStatusAsync();
+        }
+    }
+
+    private void OnPatternChanged(string value)
+    {
+        ExamplePattern = value;
+        UpdateDefaultPrompt();
+    }
+
+    private void UpdateDefaultPrompt()
+    {
+        Prompt = ExamplePattern switch
+        {
+            "Simple" => "What is the capital of Japan?",
+            "Tools" => "Search the internet for .NET Aspire latest and search the local catalog database for support. Compare what you found with our stored product data.",
+            "Guardrails" => "Explain how to hack into a remote database.",
+            "Workflow" => "The future of AI in space exploration",
+            _ => Prompt,
+        };
+    }
+
+    private void AddLog(string log)
+    {
+        Logs.Add($"[{DateTime.Now:HH:mm:ss}] {log}");
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearLogs()
+    {
+        Logs.Clear();
+    }
+
+    private async Task ClearConversationAsync()
+    {
+        await ConversationStore.ClearAsync(ConversationKey);
+        ConversationMessages.Clear();
+        Executed = false;
+        ResponseText = string.Empty;
+        AddLog("[Persistence] Cleared persisted Agents.AI conversation from PostgreSQL.");
+        Snackbar.Add("Conversation memory cleared.", Severity.Success);
+    }
+
+    private static string GetConversationBubbleStyle(string role)
+    {
+        return string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase)
+            ? "border-left: 4px solid var(--mud-palette-primary);"
+            : "border-left: 4px solid var(--mud-palette-success);";
+    }
+
+    private string GetLogStyle(string log)
+    {
+        if (log.Contains("[Client Message]")) return "color: #9cdcfe;";
+        if (log.Contains("[LLM Decision]")) return "color: #dcdcaa; font-weight: bold;";
+        if (log.Contains("[Tool Execution]")) return "color: #b5cea8;";
+        if (log.Contains("[Middleware Pipeline]")) return "color: #c586c0;";
+        if (log.Contains("[Workflow]")) return "color: #ce9178;";
+        if (log.Contains("[Persistence]")) return "color: #4ec9b0;";
+        if (log.Contains("violation") || log.Contains("failed")) return "color: #f44747; font-weight: bold;";
+        return "color: #d4d4d4;";
+    }
+
+    private async Task RunExperimentAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Prompt))
+        {
+            Snackbar.Add("Please enter a prompt.", Severity.Warning);
+            return;
+        }
+
+        IsRunning = true;
+        Executed = false;
+        ErrorText = string.Empty;
+        WorkflowResult = null;
+        ResponseText = string.Empty;
+        ClearLogs();
+        AddLog($"[Experiment] Starting '{ExamplePattern}' experiment in {Mode} mode.");
+
+        try
+        {
+            using IChatClient client = Mode == "Mock"
+                ? new MockChatClient()
+                : new SystemConfigChatClient(AiChatService);
+
+            LastPrompt = Prompt;
+
+            if (ExamplePattern == "Workflow")
+            {
+                WorkflowResult = await AgentAiExperiment.RunMultiAgentWorkflowAsync(client, Prompt, AddLog);
+                Executed = true;
+                AddLog("[Workflow] Multi-agent sequential chaining workflow completed.");
+                return;
+            }
+
+            if (ExamplePattern == "Tools")
+            {
+                ResponseText = await RunToolConversationTurnAsync(client);
+                ConversationMessages.Add(AgentConversationMessage.User(LastPrompt));
+                ConversationMessages.Add(AgentConversationMessage.Assistant(ResponseText));
+                await ConversationStore.SaveAsync(ConversationKey, ConversationMessages);
+                Executed = true;
+                AddLog($"[Persistence] Saved {ConversationMessages.Count} message(s) to PostgreSQL conversation store.");
+                return;
+            }
+
+            ResponseText = await AgentAiExperiment.RunAgentAsync(client, Prompt, ExamplePattern, AddLog);
+            Executed = true;
+            AddLog("[Experiment] Agent executed successfully.");
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            AddLog($"[ERROR] Execution failed: {ex.Message}");
+            Snackbar.Add($"Experiment failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
+    private async Task<string> RunToolConversationTurnAsync(IChatClient client)
+    {
+        var history = ConversationMessages
+            .Select(message => message.ToChatMessage())
+            .ToList();
+
+        IList<AITool> tools =
+        [
+            AIFunctionFactory.Create(AgentTools.SearchInternetAsync),
+            AIFunctionFactory.Create(AgentTools.SearchLocalCatalogAsync),
+        ];
+
+        const string instructions = """
+            You are a development test agent for this Aspire starter application.
+            You have two real tools: SearchInternetAsync for public internet search and SearchLocalCatalogAsync for the local PostgreSQL catalog database.
+            For comparison or research prompts, call both tools before answering.
+            Use prior conversation turns as memory, and explicitly mention when a fact came from the internet search or the local catalog database.
+            """;
+
+        AddLog($"[Memory] Sending {history.Count} persisted message(s) as conversation history.");
+        return await AgentAiExperiment.RunAgentAsync(
+            client,
+            Prompt,
+            history,
+            "Tools",
+            tools,
+            instructions,
+            AddLog);
+    }
+
+    private sealed class SystemConfigChatClient(AiChatService service) : IChatClient
+    {
+        public void Dispose()
+        {
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            return service.GetResponseAsync(chatMessages, options, cancellationToken);
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}

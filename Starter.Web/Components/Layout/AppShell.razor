@@ -26,6 +26,7 @@
                         Signed in as @GetDisplayName(authState.User)
                     </MudText>
                     <form method="post" action="/admin/sign-out" class="appbar-auth-form">
+                        <AntiforgeryToken />
                         <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Logout">
                             Sign out
                         </MudButton>

@@ -50,6 +50,7 @@
             }
 
             <form method="post" action="@SignInAction" class="admin-login-form">
+                <AntiforgeryToken />
                 <input name="Email" type="email" autocomplete="username" placeholder="Email" required />
                 <input name="Password" type="password" autocomplete="current-password" placeholder="Password" required />
                 <label class="admin-check-row">
